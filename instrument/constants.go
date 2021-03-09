@@ -2,6 +2,8 @@ package instrument
 
 var DEBUG bool
 var VERBOSE bool
+var TIMING bool
+
 const (
   LOGPREFIX = "INSTRUMENT:"
 )
@@ -24,4 +26,4 @@ const(
   RANGE2
 )
 
-var selectorIdents = []string{"Lock", "Unlock", "Wait", "Add", "Signal", "Broadcast"}
+var selectorIdents = []string{"Lock", "Unlock", "Wait", "Add", "Signal", "Broadcast","Done"}

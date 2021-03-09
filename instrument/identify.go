@@ -28,7 +28,6 @@ type CodeLocation struct{
 	Line                  int
 }
 
-
 func newCodeLocation(file string, line int) *CodeLocation {
 	return &CodeLocation{Filename: file, Line: line}
 }
@@ -173,7 +172,7 @@ func Identify(app *App) []*ConcurrencyUsage{
 							prog.Fset.Position(bs.Rbrace).Line,
 						)
 						concusage = append(concusage,newConcurrencyUsage(RANGE2,codeloc))
-						return false
+						return true
 					}
 					return true
 
@@ -188,11 +187,6 @@ func Identify(app *App) []*ConcurrencyUsage{
 	}
 	return concusage
 }
-
-
-
-
-
 
 
 // we need to find these
