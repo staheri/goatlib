@@ -80,6 +80,9 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, 
 
     // add other injections only to main/test file
     if mainIn(astFile) || testIn(astFile){
+      if testIn(astFile){
+        app.IsTest = true
+      }
       astutil.AddImport(prog.Fset, astFile, "os")
     	astutil.AddImport(prog.Fset, astFile, "runtime/trace")
     	astutil.AddImport(prog.Fset, astFile, "time")
