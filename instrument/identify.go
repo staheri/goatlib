@@ -86,6 +86,10 @@ func Identify(app *App) []*ConcurrencyUsage{
 							concusage = append(concusage,newConcurrencyUsage(LOCK,codeloc))
 						case "Unlock":
 							concusage = append(concusage,newConcurrencyUsage(UNLOCK,codeloc))
+            case "RLock":
+							concusage = append(concusage,newConcurrencyUsage(RLOCK,codeloc))
+						case "RUnlock":
+							concusage = append(concusage,newConcurrencyUsage(RUNLOCK,codeloc))
 						case "Add":
 							concusage = append(concusage,newConcurrencyUsage(ADD,codeloc))
 						case "Signal":
@@ -164,14 +168,7 @@ func Identify(app *App) []*ConcurrencyUsage{
 							prog.Fset.Position(p.For).Filename,
 							prog.Fset.Position(p.For).Line,
 						)
-						concusage = append(concusage,newConcurrencyUsage(RANGE1,codeloc))
-						// Right brace position
-						bs := n.(*ast.BlockStmt)
-						codeloc = newCodeLocation(
-							prog.Fset.Position(bs.Rbrace).Filename,
-							prog.Fset.Position(bs.Rbrace).Line,
-						)
-						concusage = append(concusage,newConcurrencyUsage(RANGE2,codeloc))
+						concusage = append(concusage,newConcurrencyUsage(RANGE,codeloc))
 						return true
 					}
 					return true

@@ -142,7 +142,7 @@ func astDecl_structNode() *ast.GenDecl {
 		Tok:token.TYPE,
 		Specs: []ast.Spec{
 			&ast.TypeSpec{
-				Name: &ast.Ident{ Name: "sharedInt",},
+				Name: &ast.Ident{ Name: "goatRS_sharedInt",},
 				Type: &ast.StructType{
 					Fields:&ast.FieldList{
 						List: []*ast.Field{
@@ -170,15 +170,16 @@ func astDecl_globalCount() *ast.GenDecl{
 		Tok: token.VAR,
 		Specs: []ast.Spec{
 			&ast.ValueSpec{
-				Names: []*ast.Ident{&ast.Ident{Name: "cnt"}},
-				Type: &ast.Ident{Name: "sharedInt"},
+				Names: []*ast.Ident{&ast.Ident{Name: "goatRS_cnt"}},
+				Type: &ast.Ident{Name: "goatRS_sharedInt"},
 			},
 		},
 	}
 }
 
+
 // returns GOMAXPROCS line node
-func astDecl_goMaxProcs() ast.Stmt{
+func astDecl_goMaxProcs(max int) ast.Stmt{
 	//ret := make([]ast.Stmt, 1)
 	ret := &ast.ExprStmt{
 		X: &ast.CallExpr{
@@ -187,7 +188,7 @@ func astDecl_goMaxProcs() ast.Stmt{
 				Sel: &ast.Ident{Name: "GOMAXPROCS"},
 			},
 			Args: []ast.Expr{
-				&ast.BasicLit{Kind: token.INT, Value: "1"},
+				&ast.BasicLit{Kind: token.INT, Value: strconv.Itoa(max)},
 			},
 		},
 	}
@@ -271,7 +272,7 @@ func astDecl_declFuncSched() *ast.FuncDecl{
 							&ast.ExprStmt{ // lock
 								X: &ast.CallExpr{
 									Fun: &ast.SelectorExpr{
-										X:   &ast.Ident{Name: "cnt"},
+										X:   &ast.Ident{Name: "goatRS_cnt"},
 										Sel: &ast.Ident{Name: "Lock"},
 									},
 								},
@@ -279,25 +280,59 @@ func astDecl_declFuncSched() *ast.FuncDecl{
 							&ast.DeferStmt{// defer unlock
 								Call: &ast.CallExpr{
 									Fun: &ast.SelectorExpr{
-										X:   &ast.Ident{Name: "cnt"},
+										X:   &ast.Ident{Name: "goatRS_cnt"},
 										Sel: &ast.Ident{Name: "Unlock"},
 									},
 								},
 							},
 							&ast.IfStmt{// if
-								Cond: &ast.BinaryExpr{
-									X: &ast.SelectorExpr{
-										X: &ast.Ident{Name: "cnt"},
-										Sel: &ast.Ident{Name: "n"},
+								Init: &ast.AssignStmt{
+									Tok: token.DEFINE,
+									Lhs: []ast.Expr{
+										&ast.Ident{Name: "d"},
+										&ast.Ident{Name: "err"},
 									},
-									Y: &ast.Ident{Name: "depth"},
-									Op: token.LSS,
+									Rhs:[]ast.Expr{
+										&ast.CallExpr{
+											Fun: &ast.SelectorExpr{
+												X:   &ast.Ident{Name: "strconv"},
+												Sel: &ast.Ident{Name: "Atoi"},
+											},
+											Args: []ast.Expr{
+												&ast.CallExpr{
+													Fun: &ast.SelectorExpr{
+														X:   &ast.Ident{Name: "os"},
+														Sel: &ast.Ident{Name: "Getenv"},
+													},
+													Args: []ast.Expr{
+														&ast.BasicLit{Kind: token.STRING, Value: "\"GOATRSBOUND\""},
+													},
+												},
+											},
+										},
+									},
+								},
+								Cond: &ast.BinaryExpr{
+									X: &ast.BinaryExpr{
+										X: &ast.Ident{Name: "err"},
+										Y: &ast.Ident{Name: "nil"},
+										Op: token.EQL,
+									},
+									Y: &ast.BinaryExpr{
+										X: &ast.SelectorExpr{
+											X: &ast.Ident{Name: "goatRS_cnt"},
+											Sel: &ast.Ident{Name: "n"},
+										},
+										Y:&ast.Ident{Name: "d"},
+										Op: token.LSS,
+									},
+									Op: token.LAND,
 								},
 								Body: &ast.BlockStmt{
 									List: []ast.Stmt{
 										&ast.IncDecStmt{
 											X: &ast.SelectorExpr{
-												X: &ast.Ident{Name: "cnt"},
+												X: &ast.Ident{Name: "goatRS_cnt"},
 												Sel: &ast.Ident{Name: "n"},
 											},
 											Tok: token.INC,
@@ -330,10 +365,28 @@ func astDecl_declFuncSched() *ast.FuncDecl{
 
 // wrapper for new declrations
 func astDecl_newDecls(depth int) []ast.Decl {
-	ret := make([]ast.Decl,4)
-	ret[0] = astDecl_constNode("depth",strconv.Itoa(depth))
-	ret[1] = astDecl_structNode()
-	ret[2] = astDecl_globalCount()
-	ret[3] = astDecl_declFuncSched()
+	ret := make([]ast.Decl,3)
+	//ret[0] = astDecl_constNode("depth",strconv.Itoa(depth))
+	ret[0] = astDecl_structNode()
+	ret[1] = astDecl_globalCount()
+	ret[2] = astDecl_declFuncSched()
 	return ret
+}
+
+func astDecl_convertDefer(def *ast.DeferStmt) *ast.DeferStmt{
+	return &ast.DeferStmt{
+		Call: &ast.CallExpr{
+			Fun: &ast.FuncLit{
+				Body: &ast.BlockStmt{
+					List: []ast.Stmt{
+						astDecl_callFuncSched(),
+						&ast.ExprStmt{
+							X: def.Call,
+						},
+					},
+				},
+				Type: &ast.FuncType{Params: &ast.FieldList{}},
+			},
+		},
+	}
 }

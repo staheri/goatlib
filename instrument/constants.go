@@ -11,8 +11,8 @@ const (
 const(
   LOCK     = iota
   UNLOCK
-  RWLOCK
-  RWUNLOCK
+  RLOCK
+  RUNLOCK
   SEND
   RECV
   CLOSE
@@ -22,8 +22,16 @@ const(
   SIGNAL
   BROADCAST
   SELECT
-  RANGE1
-  RANGE2
+  RANGE
 )
 
-var selectorIdents = []string{"Lock", "Unlock", "Wait", "Add", "Signal", "Broadcast","Done"}
+var selectorIdents = []string{
+  "Lock",
+  "Unlock",
+  "RLock",
+  "RUnlock",
+  "Wait",
+  "Add",
+  "Signal",
+  "Broadcast",
+  "Done"}
