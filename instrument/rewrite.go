@@ -39,10 +39,17 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, 
   // Variables
   var astfiles    []*ast.File
   var ret         []string
-  // extract concurrency lines
-  conclines := make(map[string]int)
+
+  // extract aux data
+  conclines := make(map[string]int) // extract concurrency lines
+  _concfiles := make(map[string]int) // extract concurrency files
+  var concfiles []string
   for _,c := range(concusage){
     conclines[c.OrigLoc.String()]=1
+    _concfiles[c.OrigLoc.Filename] = 1
+  }
+  for k,_ := range(_concfiles){
+    concfiles = append(concfiles,k)
   }
 
   // load program files
@@ -55,11 +62,24 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, 
   }
 
   // for all ast files in the package
+  //      add import github.com/staheri/goat/goat
+  //      inject goat.Sched_Handler to concurrency lines (astutil.Apply)
+  //      inject goat.Sched_Handler to range (astutil.Inspect)
+  // for main/test:
+  //      add (at the beginning) GOAT_done := goat.Start()
+	//      add (at the beginning) go goat.Finish(GOAT_done,10)
+  //      add (at the end) GOAT_done <- true
+  //
   // then inject sched calls to concusage (through astutil.Apply - all files )
   // then inject sched calls to range (through astutil.Inspect - all files )
   // then inject imports (through astutil.AddImport - main/test)
   // then inject tracing and gomaxprocs (through ast.Inspect - main/test)
   for _,astFile := range(astfiles){
+
+    // check if this file has concurrency usage
+    if contains(concfiles,prog.Fset.Position(astFile.Package).Filename){ // add import
+      astutil.AddImport(prog.Fset, astFile, "github.com/staheri/goat/goat")
+    }
 
     // add schedcalls wherever concusage
     astutil.Apply(astFile, func(cr *astutil.Cursor) bool{
@@ -75,21 +95,22 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, 
           switch x:= n.(type){
           case *ast.DeferStmt:
             ds := n.(*ast.DeferStmt)
-            cr.Replace(astDecl_convertDefer(ds))
+            cr.Replace(astNode_convertDefer(ds))
             _ = x
             return true
           }
-          cr.InsertBefore(astDecl_callFuncSched())
+          cr.InsertBefore(astNode_sched())
           return true
         }
       }
       return true
     },nil)
 
+    // for range statement, all concusage
     ast.Inspect(astFile, func(n ast.Node) bool {
       switch x := n.(type){
       case *ast.RangeStmt:
-        newCall := astDecl_callFuncSched()
+        newCall := astNode_sched()
         x.Body.List = append(x.Body.List,newCall)
         return true
       }
@@ -101,46 +122,29 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, 
       if testIn(astFile){
         app.IsTest = true
       }
-      astutil.AddImport(prog.Fset, astFile, "os")
-    	astutil.AddImport(prog.Fset, astFile, "runtime/trace")
-    	astutil.AddImport(prog.Fset, astFile, "time")
-      astutil.AddImport(prog.Fset, astFile, "sync")
-    	astutil.AddImport(prog.Fset, astFile, "runtime")
-    	astutil.AddImport(prog.Fset, astFile, "math/rand")
-      astutil.AddImport(prog.Fset, astFile, "strconv")
-    	if app.TO > 0{
-    		astutil.AddNamedImport(prog.Fset, astFile, "_", "net")
-    	}
 
-      // add constant, struct type, global counter, function declration
-      ast.Inspect(astFile, func(n ast.Node) bool {
-  			switch x := n.(type) {
-  			case *ast.File:
-  				// add constant, struct type, global counter, function declration
-  				decls := astDecl_newDecls(depth)
-  				decls2 := x.Decls
-  				decls = append(decls2,decls...)
-  				x.Decls = decls
-  				return true
-  			}
-  			return true
-  		})
       // add gomaxprocs and trace start/stop code
     	ast.Inspect(astFile, func(n ast.Node) bool {
     		switch x := n.(type) {
     		case *ast.FuncDecl:
     			// find 'main' function
     			if x.Name.Name == "main" && x.Recv == nil {
-    				stmts := astDecl_traceStmts(app.TO)
-            stmts = append(stmts,astDecl_goMaxProcs(1))
-    				stmts = append(stmts, x.Body.List...)
-    				x.Body.List = stmts
+            toAdd := astNode_goatMain()
+            stmts := []ast.Stmt{toAdd[0]}
+            stmts = append(stmts,toAdd[1])
+            stmts = append(stmts,x.Body.List...)
+            stmts = append(stmts,toAdd[2])
+            stmts = append(stmts,toAdd[3])
+            x.Body.List = stmts
     				return true
     			}else if strings.HasPrefix(x.Name.Name,"Test") && x.Recv == nil{
-            stmts := astDecl_traceStmts(app.TO)
-            stmts = append(stmts,astDecl_goMaxProcs(1))
-    				stmts = append(stmts, x.Body.List...)
-    				x.Body.List = stmts
+            toAdd := astNode_goatMain()
+            stmts := []ast.Stmt{toAdd[0]}
+            stmts = append(stmts,toAdd[1])
+            stmts = append(stmts,x.Body.List...)
+            stmts = append(stmts,toAdd[2])
+            stmts = append(stmts,toAdd[3])
+            x.Body.List = stmts
     				return true
           }
     		}
