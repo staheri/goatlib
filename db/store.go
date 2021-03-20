@@ -353,7 +353,7 @@ func Store(events []*trace.Event, app string) (dbName string) {
           if len(e.Stk) > 0{
             startLoc = filterSlash(path.Base(e.Stk[len(e.Stk)-1].File)+":"+ e.Stk[len(e.Stk)-1].Fn + ":" + strconv.Itoa(e.Stk[len(e.Stk)-1].Line))
           } else {
-            startLoc = "XXX"
+            startLoc = "main.main"
             //return
           }
           _,err := stmt["grtnUpdStartStmt"].Exec(startLoc,eid,gid)
