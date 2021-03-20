@@ -20,11 +20,12 @@ func astNode_sched() *ast.ExprStmt{
 
 // wrapper for new declrations
 func astNode_goatMain() []ast.Stmt {
-	ret := make([]ast.Stmt,4)
+	ret := make([]ast.Stmt,3)
 	ret[0] = astNode_goatStart()
-	ret[1] = astNode_goatStop()
-	ret[2] = astNode_goatDone()
-	ret[3] = astNode_goatDoneAck()
+	ret[1] = astNode_goatWatch()
+	ret[2] = astNode_goatStop()
+	//ret[3] = astNode_goatDoneAck()
+	//ret[4] = astNode_goatStopTrace()
 	return ret
 }
 
@@ -46,6 +47,16 @@ func astNode_goatDoneAck() *ast.ExprStmt{
 	}
 }
 
+func astNode_goatStopTrace() *ast.ExprStmt{
+	return &ast.ExprStmt{
+		X: &ast.CallExpr{
+			Fun: &ast.SelectorExpr{
+				X:   &ast.Ident{Name: "trace"},
+				Sel: &ast.Ident{Name: "Stop"},
+			},
+		},
+	}
+}
 
 // ast node for "GOAT_done := goat.Start()"
 func astNode_goatStart() *ast.AssignStmt{
@@ -66,12 +77,12 @@ func astNode_goatStart() *ast.AssignStmt{
 }
 
 // ast node for "go goat.Finish(GOAT_done)"
-func astNode_goatStop() *ast.GoStmt{
+func astNode_goatWatch() *ast.GoStmt{
 	return &ast.GoStmt{
 		Call: &ast.CallExpr{
 			Fun: &ast.SelectorExpr{
 				X:   &ast.Ident{Name: "goat"},
-				Sel: &ast.Ident{Name: "Stop"},
+				Sel: &ast.Ident{Name: "Watch"},
 			},
 			Args : []ast.Expr{
 				&ast.BasicLit{Kind: token.STRING, Value: "GOAT_done"},
@@ -95,6 +106,21 @@ func astNode_convertDefer(def *ast.DeferStmt) *ast.DeferStmt{
 					},
 				},
 				Type: &ast.FuncType{Params: &ast.FieldList{}},
+			},
+		},
+	}
+}
+
+
+func astNode_goatStop() *ast.DeferStmt{
+	return &ast.DeferStmt{
+		Call: &ast.CallExpr{
+			Fun: &ast.SelectorExpr{
+				X:   &ast.Ident{Name: "goat"},
+				Sel: &ast.Ident{Name: "Stop"},
+			},
+			Args : []ast.Expr{
+				&ast.BasicLit{Kind: token.STRING, Value: "GOAT_done"},
 			},
 		},
 	}

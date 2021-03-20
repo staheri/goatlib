@@ -80,6 +80,10 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, 
     if contains(concfiles,prog.Fset.Position(astFile.Package).Filename){ // add import
       astutil.AddImport(prog.Fset, astFile, "github.com/staheri/goat/goat")
     }
+		// 
+		// if mainIn(astFile) || testIn(astFile){
+		// 	astutil.AddImport(prog.Fset, astFile, "runtime/trace")
+		// }
 
     // add schedcalls wherever concusage
     astutil.Apply(astFile, func(cr *astutil.Cursor) bool{
@@ -132,18 +136,20 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, 
             toAdd := astNode_goatMain()
             stmts := []ast.Stmt{toAdd[0]}
             stmts = append(stmts,toAdd[1])
-            stmts = append(stmts,x.Body.List...)
             stmts = append(stmts,toAdd[2])
-            stmts = append(stmts,toAdd[3])
+						stmts = append(stmts,x.Body.List...)
+            //stmts = append(stmts,toAdd[3])
+						//stmts = append(stmts,toAdd[4])
             x.Body.List = stmts
     				return true
     			}else if strings.HasPrefix(x.Name.Name,"Test") && x.Recv == nil{
             toAdd := astNode_goatMain()
             stmts := []ast.Stmt{toAdd[0]}
             stmts = append(stmts,toAdd[1])
-            stmts = append(stmts,x.Body.List...)
             stmts = append(stmts,toAdd[2])
-            stmts = append(stmts,toAdd[3])
+						stmts = append(stmts,x.Body.List...)
+            //stmts = append(stmts,toAdd[3])
+						//stmts = append(stmts,toAdd[4])
             x.Body.List = stmts
     				return true
           }
