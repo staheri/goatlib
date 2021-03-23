@@ -19,6 +19,7 @@ const(
   GO
   WAIT
   ADD
+  DONE
   SIGNAL
   BROADCAST
   SELECT
@@ -32,6 +33,7 @@ var selectorIdents = []string{
   "RUnlock",
   "Wait",
   "Add",
+  "Done",
   "Signal",
   "Broadcast",
   "Done"}

@@ -92,6 +92,10 @@ func Identify(app *App) []*ConcurrencyUsage{
 							concusage = append(concusage,newConcurrencyUsage(RUNLOCK,codeloc))
 						case "Add":
 							concusage = append(concusage,newConcurrencyUsage(ADD,codeloc))
+						case "Done":
+							if !contains(commclauses,codeloc.String()){ // for select
+								concusage = append(concusage,newConcurrencyUsage(DONE,codeloc))
+							}
 						case "Signal":
 							concusage = append(concusage,newConcurrencyUsage(SIGNAL,codeloc))
 						case "Wait":
