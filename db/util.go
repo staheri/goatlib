@@ -4,8 +4,38 @@ import (
 	"strconv"
 	"strings"
 	_"github.com/jedib0t/go-pretty/table"
+	"database/sql"
+	"log"
 )
 
+
+
+// Operations on db
+func Clean() {
+	// Vars
+	var dbs,q string
+	// Connecting to mysql driver
+	db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/")
+	defer db.Close()
+	check(err)
+
+	log.Println("Clean: Clean all")
+	res,err := db.Query("SHOW DATABASES;")
+	check(err)
+	for res.Next(){
+		err := res.Scan(&dbs)
+		check(err)
+		//fmt.Printf("DB: %s \n",dbs)
+		if dbs[len(dbs)-1] >= '0' && dbs[len(dbs)-1] <= '9'{
+			q = "DROP DATABASE "+dbs+";"
+			_,err2 := db.Exec(q)
+			check(err2)
+			log.Println("Clean: DROP ",dbs)
+		}
+	}
+	err=res.Close()
+	check(err)
+}
 
 func check(err error){
 	if err != nil{
