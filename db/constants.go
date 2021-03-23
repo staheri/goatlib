@@ -178,3 +178,5 @@ type eventPredecessor struct{
 	g        uint64
 	clock    uint64
 }
+
+const STOREBOUND = 10000

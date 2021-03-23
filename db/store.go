@@ -9,10 +9,11 @@ import (
 	"strconv"
 	"log"
 	"strings"
+	"time"
 )
 
-func initDB(app string) (dbName string, db *sql.DB) {
-  // Connecting to mysql driver
+func initDB(dbName string) (db *sql.DB) {
+  // Initial Connecting to mysql driver
 	db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/")
 	if err != nil {
 		panic(err)
@@ -21,20 +22,11 @@ func initDB(app string) (dbName string, db *sql.DB) {
 	}
 
 	// Creating new database for current experiment
-	idx := 0
-	dbName = app + "X" + strconv.Itoa(idx)
-	//fmt.Printf("Attempt to create database: %s\n",dbName)
 	_,err = db.Exec("CREATE DATABASE "+dbName + ";")
-	for err != nil{
-		//log.Printf("Error: %v\n",err)
-		idx = idx + 1
-		dbName = app + "X" + strconv.Itoa(idx)
-		log.Printf("Store: Attempt to create database: %s\n",dbName)
-		_,err = db.Exec("CREATE DATABASE "+dbName+ ";")
-	}
-
+	check(err)
 	// Close conncection to re-establish it again with proper DBname
-	db.Close()
+	err = db.Close()
+	check(err)
 
 	// Re-establish
 	//dbName = "dinphilX18"
@@ -46,14 +38,14 @@ func initDB(app string) (dbName string, db *sql.DB) {
 	}
 	db.SetMaxOpenConns(50000)
 	db.SetMaxIdleConns(40000)
-	db.SetConnMaxLifetime(0)
+	db.SetConnMaxLifetime(20*time.Second)
 
-  return dbName,db
+  return db
 
 }
 
 // Take sequence of events, create a new DB Schema and insert events into tables
-func Store(events []*trace.Event, app string) (dbName string) {
+func Store(events []*trace.Event, dbName string) (db *sql.DB) {
   // Variables
 	var err                  error
 	var res                  sql.Result
@@ -77,8 +69,8 @@ func Store(events []*trace.Event, app string) (dbName string) {
 
 
   // init DB
-  dbName, db := initDB(app)
-  defer db.Close()
+  db = initDB(dbName)
+  //defer db.Close()
 
 	// Create the triple tables (events, stackFrames, Args)
 	createTables(db)
@@ -86,21 +78,24 @@ func Store(events []*trace.Event, app string) (dbName string) {
 	// for the events with resources (channels, mutex, WaitingGroup)
 	insertEventResourceStmt, err := db.Prepare("INSERT INTO Events (offset, type, vc , ts, g, p, linkoff, predG, predClk, rid, reid, rval, rclock, stkID, src, src0) values (? ,? ,? ,? ,? ,? ,? ,? ,? ,? ,? ,? ,? ,? ,? ,? );")
 	check(err)
-	defer insertEventResourceStmt.Close()
 
 	insertStackStmt, err := db.Prepare("INSERT INTO StackFrames (eventID, stkIDX, pc, func, file, line) values (?, ?, ?, ?, ?, ?)")
 	check(err)
-	defer insertStackStmt.Close()
 
 	insertArgStmt, err   := db.Prepare("INSERT INTO Args (eventID, arg, value) values (?, ?, ?)")
 	check(err)
-	defer insertArgStmt.Close()
 
   stmt := auxPrepareStmts(db)
 
+	cnt := 0
 
   // Iterate over events and stroe in relational databases
 	for _,e := range events{
+		if cnt > STOREBOUND{
+			break
+		}
+		cnt++
+
 		desc := EventDescriptions[e.Type]
 		// fresh values for each event
 		predG    := sql.NullInt64{}
@@ -489,9 +484,17 @@ func Store(events []*trace.Event, app string) (dbName string) {
 
 	}
   for _,v := range(stmt){
-    v.Close()
+    err = v.Close()
+		check(err)
   }
-	return dbName
+
+	err = insertEventResourceStmt.Close()
+	check(err)
+	err = insertStackStmt.Close()
+	check(err)
+	err = insertArgStmt.Close()
+	check(err)
+	return db
 }
 
 // Create tables for newly created schema db
@@ -576,10 +579,10 @@ func createTables(db *sql.DB){
 func createTable(stmt , name string, db *sql.DB) () {
 	//fmt.Printf("Creating table %v ... \n",name)
 	_,err := db.Exec(stmt)
-	if err != nil {
-		panic(err)
-	}
-	log.Printf("%v Created! \n",name)
+	check(err)
+	log.Printf("Store: %v Created! \n",name)
+	//err = stmt.Close()
+	//check(err)
 }
 
 // Create a map of goroutine/channel table statement

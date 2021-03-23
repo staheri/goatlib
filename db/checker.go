@@ -12,6 +12,11 @@ import (
 
 )
 
+type Report struct{
+	GlobalDL      bool
+	Leaked        int
+}
+
 type GoroutineInfo struct{
 	main          int
 	trace         int
@@ -20,49 +25,7 @@ type GoroutineInfo struct{
 }
 
 func gids(dbName string) (gs GoroutineInfo){
-	// Variables
-	var   linkoff  sql.NullInt32
-	var   g        int
 
-	// Establish connection to DB
- db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/"+dbName)
- check(err)
- log.Println("Cheker(short): Connected to ",dbName)
- defer db.Close()
- // END DB
-
- q := `Select linkoff from Events where type="EvGoCreate";`
- res, err := db.Query(q)
- check(err)
- for res.Next(){
-	 err = res.Scan(&linkoff)
-	 if linkoff.Valid {
-		 //
-		 q2 := `Select g from Events where offset=`+strconv.Itoa(int(linkoff.Int32))+`;`
-		 res2, err2 := db.Query(q2)
-		 check(err2)
-		 if res2.Next(){
-			 err2 = res2.Scan(&g)
-			 if gs.main == 0{
-				 gs.main = g
-				 continue
-			 }
-			 if gs.trace == 0{
-				 gs.trace = g
-				 // check
-				 continue
-			 }
-			 if gs.watcher == 0{
-				 gs.watcher = g
-				 // check
-				 continue
-			 }
-			 gs.app = append(gs.app,g)
-		 }
-		 res2.Close()
-	 }
- }
- res.Close()
  return gs
 }
 
@@ -78,40 +41,65 @@ func gids(dbName string) (gs GoroutineInfo){
 //             watchGoroutine = (select g from events where offset=res.linkoff)
 
 //
-func Checker(dbName string, long bool) bool{
-	gs := gids(dbName)
-	// fmt.Println("Main:",gs.main)
-	// fmt.Println("Watcher:",gs.watcher)
-	// fmt.Println("Trace:",gs.trace)
-	// fmt.Println("App:",gs.app)
-  if long {
-		return longLeakReport(dbName,gs)
-	}
-	return shortLeakReport(dbName,gs)
-}
+func Checker(db *sql.DB) Report{
 
-func shortLeakReport(dbName string,gs GoroutineInfo) bool{
 	// Variables
-	var   isGlobalDL   bool
-	var suspicious []int
-	var event string
+	var linkoff       sql.NullInt32
+	var g             int
+	var isGlobalDL    bool
+	var suspicious    []int
+	var event         string
+	var gs            GoroutineInfo
+	var offsets       []int
 
-	// Establish connection to DB
-	db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/"+dbName)
-	if err != nil {
-		panic(err)
-	}else{
-		log.Println("Cheker(short): Connected to ",dbName)
-	}
-	defer db.Close()
-	// END DB
-
+	// Prepare statements
 	lastEventStmt,err := db.Prepare("SELECT type FROM Events WHERE g=? ORDER BY id DESC LIMIT 1")
 	check(err)
-	defer lastEventStmt.Close()
 
+	findGStmt,err := db.Prepare("SELECT g FROM Events WHERE offset=?")
+	check(err)
+
+
+	// Find G information
+	q := `Select linkoff from Events where type="EvGoCreate";`
+	res, err := db.Query(q)
+	check(err)
+	for res.Next(){
+		err = res.Scan(&linkoff)
+		if linkoff.Valid{
+			offsets = append(offsets,int(linkoff.Int32))
+		}
+	}
+ 	res.Close()
+
+ 	for _,off := range(offsets){
+	 	res2, err2 := findGStmt.Query(off)
+	 	check(err2)
+	 	if res2.Next(){
+		 	err2 = res2.Scan(&g)
+		 	if gs.main == 0{
+			 	gs.main = g
+				res2.Close()
+			 	continue
+		 	}
+		 	if gs.trace == 0{
+			 	gs.trace = g
+			 	// check
+				res2.Close()
+			 	continue
+		 	}
+		 	if gs.watcher == 0{
+			 	gs.watcher = g
+			 	// check
+				res2.Close()
+			 	continue
+		 	}
+		 	gs.app = append(gs.app,g)
+	 	}
+	 	res2.Close()
+ 	}
 	// check for global deadlock
-	res,err := lastEventStmt.Query(gs.main)
+	res,err = lastEventStmt.Query(gs.main)
 	check(err)
 	if res.Next(){
 		err = res.Scan(&event)
@@ -137,7 +125,6 @@ func shortLeakReport(dbName string,gs GoroutineInfo) bool{
 		res.Close()
 	}
 
-
 	// ****************
 	// Generate report
 	colorReset := "\033[0m"
@@ -145,16 +132,19 @@ func shortLeakReport(dbName string,gs GoroutineInfo) bool{
 	colorGreen := "\033[32m"
 	if isGlobalDL{
 		fmt.Println(string(colorRed),"Fail (global deadlock)",string(colorReset))
-		return false
+		return Report{GlobalDL: true,Leaked:0}
 	} else if len(suspicious) != 0{
 		fmt.Println(string(colorRed),"Fail (partial deadlock - leak)",string(colorReset))
-		return false
+		return Report{GlobalDL: false,Leaked:len(suspicious)}
 	}
 	fmt.Println(string(colorGreen),"Pass",string(colorReset))
-	return true
+
+	findGStmt.Close()
+	lastEventStmt.Close()
+	return Report{GlobalDL: false,Leaked:0}
 }
 
-func longLeakReport(dbName string, gs GoroutineInfo) bool{
+func longLeakReport(dbName string, gs GoroutineInfo) Report{
 	// Establish connection to DB
 	db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/"+dbName)
 	if err != nil {
@@ -163,6 +153,9 @@ func longLeakReport(dbName string, gs GoroutineInfo) bool{
 		log.Println("Cheker(long): Connected to ",dbName)
 	}
 	defer db.Close()
+	db.SetMaxOpenConns(50000)
+	db.SetMaxIdleConns(40000)
+	db.SetConnMaxLifetime(0)
 	// END DB
 
 	var event,rid string
@@ -231,7 +224,7 @@ func longLeakReport(dbName string, gs GoroutineInfo) bool{
 	return textReport(lastEvents,gs)
 }
 
-func textReport(lastEvents map[int]string,gs GoroutineInfo) bool{
+func textReport(lastEvents map[int]string,gs GoroutineInfo) Report{
 	//writer := tabwriter.NewWriter(os.Stdout,0 , 16, 1, '\t', tabwriter.AlignRight)
 	var  suspicious []int
 	var   isGlobalDL   bool
@@ -244,14 +237,14 @@ func textReport(lastEvents map[int]string,gs GoroutineInfo) bool{
 		isGlobalDL = true
 	}
 	for k,v := range(lastEvents){
-		if v != "EvGoEnd"{
+		if v != "EvGoEnd" && k != gs.main{
 			suspicious = append(suspicious,k)
 		}
 	}
 
 	if isGlobalDL{
 		fmt.Println("Global Deadlock:",string(colorRed),"TRUE",string(colorReset))
-		return false
+		return Report{GlobalDL: true,Leaked:0}
 	} else{
 		fmt.Println("Global Deadlock:",string(colorGreen),"FALSE",string(colorReset))
 	}
@@ -262,8 +255,8 @@ func textReport(lastEvents map[int]string,gs GoroutineInfo) bool{
 			temp = temp + strconv.Itoa(i) + " "
 		}
 		fmt.Println("Leaked Goroutines:",string(colorRed),temp,string(colorReset))
-		return false
+		return Report{GlobalDL: false,Leaked:len(suspicious)}
 	}
 	fmt.Println("Leaked Goroutines:",string(colorGreen),"NONE",string(colorReset))
-	return true
+	return Report{GlobalDL: false,Leaked:0}
 }
