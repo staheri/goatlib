@@ -31,17 +31,18 @@ func newApp(appname,path string) *App{
 	return &App{Path: path, Conf: conf, Name: appname}
 }
 
-func Instrument(path string) *App{
+func Instrument(path string, traceOnly bool) *App{
   // Create app
 	// Obtain Name
-	appname := appNameFolder(path)
+	//appname := appNameFolder(path)
+	appname := gobenchAppNameFolder(path)
 
   app := newApp(appname,path)
   concusage := Identify(app)
 	for _,c := range(concusage){
 		fmt.Println(c.String())
 	}
-	iapp := NewInstrumentedApp(app,concusage)
+	iapp := NewInstrumentedApp(app,concusage,traceOnly)
 	iapp.Root = app
   return iapp
 }

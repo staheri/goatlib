@@ -22,6 +22,34 @@ func contains(s []string, e string) bool {
     return false
 }
 
+// Returns appName from goBench folders (omitting forbidden chars for database)
+func gobenchAppNameFolder(path string) string{
+  if !strings.HasSuffix(path,"/"){
+    path = path + "/"
+  }
+  a := strings.Split(path,"/")
+	ret := a[len(a)-4]+"_"+a[len(a)-3]+"_"+a[len(a)-2]
+  b := strings.Split(ret,".")
+	s := ""
+	for i:=0;i<len(b);i++{
+		if i == len(b) - 1{
+			s = s + b[i]
+		}else{
+			s = s + b[i]+"_"
+		}
+	}
+	ret = ""
+	for _,b := range s{
+		if string(b) == "-"{
+			ret = ret + "_"
+		} else{
+			ret = ret + string(b)
+		}
+	}
+	return ret
+}
+
+
 // Returns appName from long paths (omitting forbidden chars for database)
 func appNameFolder(path string) string{
   if !strings.HasSuffix(path,"/"){

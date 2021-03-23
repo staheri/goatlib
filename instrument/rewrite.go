@@ -16,26 +16,39 @@ import (
   "os"
 )
 
-func NewInstrumentedApp(app *App, concusage []*ConcurrencyUsage) (iapp *App){
+const MAXPROCS = 4
+
+func NewInstrumentedApp(app *App, concusage []*ConcurrencyUsage,traceOnly bool) (iapp *App){
   var newPath,newName string
-  newName =app.Name+"_INST"
+  newName =app.Name
   // create placeholder folder for instrumented app
   if ws := os.Getenv("GOATWS");ws!="" {
-    newPath = ws+"/"+newName
+		if traceOnly{
+			newPath = ws+"/"+newName+"_0"
+		}else{
+			newPath = ws+"/"+newName
+		}
+
     err := os.MkdirAll(newPath,os.ModePerm)
   	check(err)
   }else{
     panic("GOATWS is not set!")
   }
-  // we can rewrite differently each time
-  app.rewrite_randomSched(newPath,concusage,2)
+
+	if traceOnly{
+		app.rewrite_traceOnly(newPath)
+	} else{
+		// we can rewrite differently each time
+	  app.rewrite_randomSched(newPath,concusage)
+	}
+
 
   iapp = newApp(newName,newPath)
   iapp.IsTest = app.IsTest
   return iapp
 }
 
-func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, depth int) []string{
+func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage) []string{
   // Variables
   var astfiles    []*ast.File
   var ret         []string
@@ -80,7 +93,7 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, 
     if contains(concfiles,prog.Fset.Position(astFile.Package).Filename){ // add import
       astutil.AddImport(prog.Fset, astFile, "github.com/staheri/goat/goat")
     }
-		// 
+		//
 		// if mainIn(astFile) || testIn(astFile){
 		// 	astutil.AddImport(prog.Fset, astFile, "runtime/trace")
 		// }
@@ -133,7 +146,7 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, 
     		case *ast.FuncDecl:
     			// find 'main' function
     			if x.Name.Name == "main" && x.Recv == nil {
-            toAdd := astNode_goatMain()
+            toAdd := astNode_goatMain(1)
             stmts := []ast.Stmt{toAdd[0]}
             stmts = append(stmts,toAdd[1])
             stmts = append(stmts,toAdd[2])
@@ -143,7 +156,7 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, 
             x.Body.List = stmts
     				return true
     			}else if strings.HasPrefix(x.Name.Name,"Test") && x.Recv == nil{
-            toAdd := astNode_goatMain()
+            toAdd := astNode_goatMain(1)
             stmts := []ast.Stmt{toAdd[0]}
             stmts = append(stmts,toAdd[1])
             stmts = append(stmts,toAdd[2])
@@ -173,4 +186,68 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage, 
 
 	/*
 	}*/
+}
+
+
+func (app *App) rewrite_traceOnly(path string) []string{
+  // Variables
+  var astfiles    []*ast.File
+  var ret         []string
+  // load program files
+  prog, err := app.Conf.Load()
+	check(err)
+  for _,crt := range(prog.Created){
+    for _,ast := range(crt.Files){
+      astfiles = append(astfiles,ast)
+    }
+  }
+
+  // for main/test:
+  //      add (at the beginning) GOAT_done := goat.Start()
+	//      add (at the beginning) go goat.Finish(GOAT_done,10)
+  //      add (at the end) GOAT_done <- true
+  for _,astFile := range(astfiles){
+    if mainIn(astFile) || testIn(astFile){
+      if testIn(astFile){
+        app.IsTest = true
+      }
+			// add import
+			astutil.AddImport(prog.Fset, astFile, "github.com/staheri/goat/goat")
+      // add goat start, stop, watch
+    	ast.Inspect(astFile, func(n ast.Node) bool {
+    		switch x := n.(type) {
+    		case *ast.FuncDecl:
+    			// find 'main' function
+    			if x.Name.Name == "main" && x.Recv == nil {
+            toAdd := astNode_goatMain(MAXPROCS)
+            stmts := []ast.Stmt{toAdd[0]}
+            stmts = append(stmts,toAdd[1])
+            stmts = append(stmts,toAdd[2])
+						stmts = append(stmts,x.Body.List...)
+            x.Body.List = stmts
+    				return true
+    			}else if strings.HasPrefix(x.Name.Name,"Test") && x.Recv == nil{
+            toAdd := astNode_goatMain(MAXPROCS)
+            stmts := []ast.Stmt{toAdd[0]}
+            stmts = append(stmts,toAdd[1])
+            stmts = append(stmts,toAdd[2])
+						stmts = append(stmts,x.Body.List...)
+            x.Body.List = stmts
+    				return true
+          }
+    		}
+    		return true
+    	})
+    } // end for main
+
+    // write files
+    var buf bytes.Buffer
+  	err := printer.Fprint(&buf, prog.Fset, astFile)
+  	check(err)
+    filename := filepath.Join(path, strings.Split(filepath.Base(prog.Fset.Position(astFile.Pos()).Filename),".")[0]+".go")
+    err = ioutil.WriteFile(filename, buf.Bytes(), 0666)
+    check(err)
+    ret = append(ret,filename)
+  }
+  return ret
 }
