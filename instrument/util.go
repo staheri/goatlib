@@ -23,7 +23,7 @@ func contains(s []string, e string) bool {
 }
 
 // Returns appName from goBench folders (omitting forbidden chars for database)
-func gobenchAppNameFolder(path string) string{
+func GobenchAppNameFolder(path string) string{
   if !strings.HasSuffix(path,"/"){
     path = path + "/"
   }
