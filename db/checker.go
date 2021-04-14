@@ -5,28 +5,34 @@ import (
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"strconv"
-	"log"
 	"os"
 	"strings"
 	"github.com/jedib0t/go-pretty/table"
-
+	"path/filepath"
 )
 
+var MessageFormat=`
+=============================== GOAT ===============================
+Total Leaked: %v
+--------------------------------------------------------------------
+%v
+====================================================================
+`
+
+var MessagePerLeaked =`
+Leaked #%v
+--------------------------------------------------------------------
+Goroutine ID %v
+Created in %v
+Last event: %v
+StackTrace:
+%v
+`
 type Report struct{
 	GlobalDL      bool
 	Leaked        int
-}
-
-type GoroutineInfo struct{
-	main          int
-	trace         int
-	watcher       int
-	app           []int
-}
-
-func gids(dbName string) (gs GoroutineInfo){
-
- return gs
+	Message       string
+	TotalG        int
 }
 
 // a function to query the database
@@ -41,127 +47,170 @@ func gids(dbName string) (gs GoroutineInfo){
 //             watchGoroutine = (select g from events where offset=res.linkoff)
 
 //
-func Checker(db *sql.DB) Report{
+func Checker(db *sql.DB, long bool) Report{
 
 	// Variables
-	var linkoff       sql.NullInt32
-	var g             int
-	var isGlobalDL    bool
-	var suspicious    []int
-	var event         string
-	var gs            GoroutineInfo
-	var offsets       []int
+	var isGlobalDL      bool
+	var suspicious      []uint64
+	var stack_id        uint64
+	var createStack_id  uint64
+	var event           string
+	var file,funct,line string
+
+
+	lastEventMap := make(map[uint64]string)
+	stk_idLastEventMap := make(map[uint64]uint64)
+	stackTraceMap := make(map[uint64]string)
+	createLocMap := make(map[uint64]string)
+
 
 	// Prepare statements
-	lastEventStmt,err := db.Prepare("SELECT type FROM Events WHERE g=? ORDER BY id DESC LIMIT 1")
+	lastEventStmt,err := db.Prepare("SELECT type,stack_id FROM Events WHERE g=? ORDER BY id DESC LIMIT 1")
 	check(err)
 
-	findGStmt,err := db.Prepare("SELECT g FROM Events WHERE offset=?")
+	stackTraceStmt,err := db.Prepare("SELECT file,func,line FROM StackFrames WHERE stack_id=? ORDER BY id")
 	check(err)
 
-
-	// Find G information
-	q := `Select linkoff from Events where type="EvGoCreate";`
-	res, err := db.Query(q)
+	createLocStmt,err := db.Prepare("SELECT createStack_id FROM Goroutines WHERE gid=?")
 	check(err)
-	for res.Next(){
-		err = res.Scan(&linkoff)
-		if linkoff.Valid{
-			offsets = append(offsets,int(linkoff.Int32))
-		}
-	}
- 	res.Close()
 
- 	for _,off := range(offsets){
-	 	res2, err2 := findGStmt.Query(off)
-	 	check(err2)
-	 	if res2.Next(){
-		 	err2 = res2.Scan(&g)
-		 	if gs.main == 0{
-			 	gs.main = g
-				res2.Close()
-			 	continue
-		 	}
-		 	if gs.trace == 0{
-			 	gs.trace = g
-			 	// check
-				res2.Close()
-			 	continue
-		 	}
-		 	if gs.watcher == 0{
-			 	gs.watcher = g
-			 	// check
-				res2.Close()
-			 	continue
-		 	}
-		 	gs.app = append(gs.app,g)
-	 	}
-	 	res2.Close()
- 	}
+	// get goroutines information
+	gs := GetGoroutineInfo(db)
+	//fmt.Println(gs.String())
+
+
 	// check for global deadlock
-	res,err = lastEventStmt.Query(gs.main)
+	res,err := lastEventStmt.Query(gs.main.id)
 	check(err)
+	isGlobalDL = false
 	if res.Next(){
-		err = res.Scan(&event)
+		err = res.Scan(&event,&stack_id)
 		check(err)
+		lastEventMap[gs.main.id]=event
+		stk_idLastEventMap[gs.main.id]=stack_id
 		if event != "EvGoSched"{
 			isGlobalDL = true
 		}
 	}
 	res.Close()
 
-	// check for partial deadlock
-	for _,gi := range(gs.app){
-		// Last event
-		res,err = lastEventStmt.Query(gi)
+	if !isGlobalDL{
+		q := `SELECT file,func,line FROM StackFrames WHERE stack_id=`+strconv.FormatUint(stack_id,10)+` ORDER BY id LIMIT 1`
+		res,err = db.Query(q)
 		check(err)
-		for res.Next(){
-			err = res.Scan(&event)
+		if res.Next(){
+			err = res.Scan(&file,&funct,&line)
 			check(err)
-			if event != "EvGoEnd" {
-				suspicious = append(suspicious,gi)
+			if !strings.HasPrefix(funct,"runtime.StopTrace"){
+				isGlobalDL = true
 			}
 		}
 		res.Close()
 	}
 
+
+
+	// check for partial deadlock
+	totalg := len(gs.app)+1
+	for _,gi := range(gs.app){
+		// Last event
+		res,err = lastEventStmt.Query(gi.id)
+		check(err)
+		for res.Next(){
+			err = res.Scan(&event,&stack_id)
+			check(err)
+			if event != "EvGoEnd" {
+				suspicious = append(suspicious,gi.id)
+				lastEventMap[gi.id]=event
+				stk_idLastEventMap[gi.id]=stack_id
+			}
+		}
+		res.Close()
+	}
+	res.Close()
+	lastEventStmt.Close()
+
+	for _,gi := range(suspicious){
+		res,err = stackTraceStmt.Query(stk_idLastEventMap[gi])
+		check(err)
+		stackElements := []string{}
+		for res.Next(){
+			err = res.Scan(&file,&funct,&line)
+			check(err)
+			stackElem := filepath.Base(funct)+"@"+filepath.Base(file)+":"+line
+			stackElements = append(stackElements,stackElem)
+		}
+		res.Close()
+		stackTraceMap[gi]=strings.Join(stackElements,"\n")
+
+		res,err = createLocStmt.Query(gi)
+		check(err)
+		if res.Next(){
+			err = res.Scan(&createStack_id)
+			check(err)
+		}
+		res.Close()
+		if createStack_id != 0{
+			res,err = stackTraceStmt.Query(createStack_id)
+			check(err)
+			stackElements := []string{}
+			for res.Next(){
+				err = res.Scan(&file,&funct,&line)
+				check(err)
+				stackElem := []string{funct,file,line}
+				stackElements = append(stackElements,strings.Join(stackElem,":"))
+			}
+			res.Close()
+			createLocMap[gi]=strings.Join(stackElements,"\n")
+		}
+	}
+	res.Close()
+	stackTraceStmt.Close()
+	createLocStmt.Close()
+
+	// ****************
+	// Generate Message
+
+	msg := "=============================== GOAT ===============================\n"
+	if isGlobalDL {
+		msg = msg + fmt.Sprintf("Total leaked: %v\n",len(suspicious)+1)
+	}else{
+		msg = msg + fmt.Sprintf("Total leaked: %v\n",len(suspicious))
+	}
+	msg = msg + "--------------------------------------------------------------------"
+
+	for i,g := range(suspicious){
+		msg = msg + fmt.Sprintf(MessagePerLeaked,i,g,createLocMap[g],lastEventMap[g],stackTraceMap[g])
+	}
+	msg = msg + "===================================================================="
+
 	// ****************
 	// Generate report
+	//if long{
+	//	return longLeakReport(db,gs)
+	//}
+
+
 	colorReset := "\033[0m"
 	colorRed := "\033[31m"
-	colorGreen := "\033[32m"
+	//colorGreen := "\033[32m"
 	if isGlobalDL{
 		fmt.Println(string(colorRed),"Fail (global deadlock)",string(colorReset))
-		return Report{GlobalDL: true,Leaked:0}
+		return Report{GlobalDL: true,Leaked:0, Message:msg, TotalG:totalg}
 	} else if len(suspicious) != 0{
-		fmt.Println(string(colorRed),"Fail (partial deadlock - leak)",string(colorReset))
-		return Report{GlobalDL: false,Leaked:len(suspicious)}
+		fmt.Println(string(colorRed),"Fail (partial deadlock)",string(colorReset))
+		return Report{GlobalDL: false,Leaked:len(suspicious), Message:msg, TotalG:totalg}
 	}
-	fmt.Println(string(colorGreen),"Pass",string(colorReset))
-
-	findGStmt.Close()
-	lastEventStmt.Close()
-	return Report{GlobalDL: false,Leaked:0}
+	//fmt.Println(string(colorGreen),"Pass",string(colorReset))
+	return Report{GlobalDL: false,Leaked:0, Message:msg, TotalG:totalg}
 }
 
-func longLeakReport(dbName string, gs GoroutineInfo) Report{
-	// Establish connection to DB
-	db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/"+dbName)
-	if err != nil {
-		panic(err)
-	}else{
-		log.Println("Cheker(long): Connected to ",dbName)
-	}
-	defer db.Close()
-	db.SetMaxOpenConns(50000)
-	db.SetMaxIdleConns(40000)
-	db.SetConnMaxLifetime(0)
-	// END DB
+func longLeakReport(db *sql.DB, gs GoroutineInfo) Report{
 
 	var event,rid string
 
 	// last events stroe every last event of goroutines
-	lastEvents := make(map[int]string)
+	lastEvents := make(map[uint64]string)
 
 
 	lastEventStmt,err := db.Prepare("SELECT type FROM Events WHERE g=? ORDER BY id DESC LIMIT 1")
@@ -180,15 +229,15 @@ func longLeakReport(dbName string, gs GoroutineInfo) Report{
 	for _,gi := range(append(gs.app,gs.main)){
 		// New row
 		var row []interface{}
-		row = append(row,gi)
+		row = append(row,gi.id)
 
 		// Last event
-		res,err := lastEventStmt.Query(gi)
+		res,err := lastEventStmt.Query(gi.id)
 		check(err)
 		for res.Next(){
 			err = res.Scan(&event)
 			check(err)
-			lastEvents[gi]=event
+			lastEvents[gi.id]=event
 			//gs = append(gs,g) // append g to gs
 			row = append(row,event)
 		}
@@ -197,7 +246,7 @@ func longLeakReport(dbName string, gs GoroutineInfo) Report{
 		resMap := make(map[string]int)
 		var resources []interface{}
 		var otherg []interface{}
-		res,err = resStmt.Query(gi)
+		res,err = resStmt.Query(gi.id)
 		check(err)
 		for res.Next(){
 			err = res.Scan(&event,&rid)
@@ -224,20 +273,20 @@ func longLeakReport(dbName string, gs GoroutineInfo) Report{
 	return textReport(lastEvents,gs)
 }
 
-func textReport(lastEvents map[int]string,gs GoroutineInfo) Report{
+func textReport(lastEvents map[uint64]string,gs GoroutineInfo) Report{
 	//writer := tabwriter.NewWriter(os.Stdout,0 , 16, 1, '\t', tabwriter.AlignRight)
-	var  suspicious []int
+	var  suspicious []uint64
 	var   isGlobalDL   bool
 
 	colorReset := "\033[0m"
 	colorRed := "\033[31m"
 	colorGreen := "\033[32m"
 
-	if lastEvents[gs.main] != "EvGoSched"{
+	if lastEvents[gs.main.id] != "EvGoSched"{
 		isGlobalDL = true
 	}
 	for k,v := range(lastEvents){
-		if v != "EvGoEnd" && k != gs.main{
+		if v != "EvGoEnd" && k != gs.main.id{
 			suspicious = append(suspicious,k)
 		}
 	}
@@ -252,7 +301,7 @@ func textReport(lastEvents map[int]string,gs GoroutineInfo) Report{
 	if len(suspicious) != 0{
 		temp := ""
 		for _,i := range(suspicious){
-			temp = temp + strconv.Itoa(i) + " "
+			temp = temp + strconv.FormatUint(i,10) + " "
 		}
 		fmt.Println("Leaked Goroutines:",string(colorRed),temp,string(colorReset))
 		return Report{GlobalDL: false,Leaked:len(suspicious)}
