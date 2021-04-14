@@ -9,73 +9,76 @@ import (
 	"os"
 	"os/exec"
 	"log"
-	"time"
   "github.com/staheri/goatlib/trace"
 )
 
-// - Compile and executes the modified source
-// - Parse collected trace
-func (app *App)ExecuteTrace() ([]*trace.Event, error){
-  var cmd *exec.Cmd
-	// create binary file holder
-	log.Println("ExecuteTrace: Create tempdir ")
-	tmpBinary, err := ioutil.TempFile("", "GOAT")
+// build the path and return the binary name
+func BuildTest (path,buildID string) string{
+	var cmd *exec.Cmd
+  // create binary file holder
+  tmpBinary, err := ioutil.TempFile(path, "*"+buildID)
   if err != nil {
-		fmt.Println("create temp file error")
-		return nil, err
-	}
-
-	// remove it after done
-	defer os.Remove(tmpBinary.Name())
-
-	// build binary
-  if app.IsTest{
-    cmd = exec.Command("go", "test", "-c", "-o", tmpBinary.Name())
-  } else{
-    cmd = exec.Command("go", "build", "-o", tmpBinary.Name())
+    fmt.Println("create temp file error")
+    panic(err)
   }
 
+  cmd = exec.Command("go", "test", "-c", "-o", tmpBinary.Name())
+
+  var stderr bytes.Buffer
+  cmd.Stderr = &stderr
+  cmd.Dir = path
+
+  err = cmd.Run()
+  if err != nil {
+    fmt.Println("go build error", stderr.String())
+    panic(err)
+  }
+	return tmpBinary.Name()
+}
+
+// build the path and return the binary name
+func BuildMain (path,buildID string) string {
+	var cmd *exec.Cmd
+  // create binary file holder
+  tmpBinary, err := ioutil.TempFile(path, "*"+buildID)
+  if err != nil {
+    fmt.Println("create temp file error")
+    panic(err)
+  }
+
+  cmd = exec.Command("go", "build", "-o", tmpBinary.Name())
+
+  var stderr bytes.Buffer
+  cmd.Stderr = &stderr
+  cmd.Dir = path
+
+  err = cmd.Run()
+  if err != nil {
+    fmt.Println("go build error", stderr.String())
+    panic(err)
+  }
+	return tmpBinary.Name()
+}
+
+// - executes the instrumented binary
+// - Parses collected trace
+func ExecuteTrace(binary string) (*trace.ParseResult, error){
 	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	cmd.Dir = app.Path
-
-	// timing start
-	start := time.Now()
-
-	err = cmd.Run()
-	if err != nil {
-		fmt.Println("go build error", stderr.String())
-		return nil, err
-	}
-
-	// timing end
-	end := time.Since(start)
-	log.Printf("[TIME %v: %v]\n","ExecTrace Build",end)
-	if TIMING{
-		fmt.Printf("[TIME %v: %v]\n","ExecTrace Build",end)
-	}
-
-
+	var stdout bytes.Buffer
+  var cmd *exec.Cmd
 	// run
-	log.Println("ExecuteTrace: Run ",tmpBinary.Name())
-	stderr.Reset()
-	cmd = exec.Command(tmpBinary.Name())
+	log.Println("ExecuteTrace: Run ",binary)
+	cmd = exec.Command(binary)
 	cmd.Stderr = &stderr
+	cmd.Stdout = &stdout
 
-	// timing start
-	start = time.Now()
 
-	if err = cmd.Run(); err != nil {
-		fmt.Println("modified program failed:", err, stderr.String())
-		return nil, err
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("modified program failed\nErr: %v\nStderr: %v\nStdout: %v\n", err, stderr.String(),stdout.String())
+		err1 := errors.New(fmt.Sprintf("%v",err))
+		err1 = fmt.Errorf("%v:%v",err,stderr.String())
+		return nil, err1
 	}
-	// timing end
-	end = time.Since(start)
-	log.Printf("[TIME %v: %v]\n","ExecTrace Run",end)
-	if TIMING{
-		fmt.Printf("[TIME %v: %v]\n","ExecTrace Run",end)
-	}
-
 
 	// check length of stderr
 	if stderr.Len() == 0 {
@@ -84,18 +87,7 @@ func (app *App)ExecuteTrace() ([]*trace.Event, error){
 
 	// parse
 	log.Println("ExecuteTrace: Redirect stderr to ParseTrace ")
-
-	// timing start
-	start = time.Now()
-	// command
-	r,e := parseTrace(&stderr, tmpBinary.Name())
-	// timing end
-	end = time.Since(start)
-	log.Printf("[TIME %v: %v]\n","Parse Trace",end)
-	if TIMING{
-		fmt.Printf("[TIME %v: %v]\n","Parse Trace",end)
-	}
-	return r,e
+	return parseTrace(&stderr, binary)
 }
 
 // removes dir
@@ -106,7 +98,7 @@ func removeDir(dir string) {
 }
 
 // reads trace from stderr (io.reader) and parse
-func parseTrace(r io.Reader, binary string) ([]*trace.Event, error) {
+func parseTrace(r io.Reader, binary string) (*trace.ParseResult, error) {
 	parseResult, err := trace.Parse(r,binary)
 	if err != nil {
 		return nil, err
@@ -114,5 +106,5 @@ func parseTrace(r io.Reader, binary string) ([]*trace.Event, error) {
 
 	err = trace.Symbolize(parseResult.Events, binary)
 
-	return parseResult.Events, err
+	return &parseResult, err
 }

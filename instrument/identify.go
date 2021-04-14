@@ -5,7 +5,8 @@ import(
 	"go/token"
 	"golang.org/x/tools/go/ast/astutil"
 	"strconv"
-	_"fmt"
+	"golang.org/x/tools/go/loader"
+	"path/filepath"
 )
 
 type ConcurrencyUsage struct{
@@ -19,6 +20,7 @@ func newConcurrencyUsage(typ int, codeloc *CodeLocation) *ConcurrencyUsage{
 }
 
 func (cl *ConcurrencyUsage) String() string{
+	//return concTypeDescription[cl.Type]+" - " +cl.OrigLoc.Filename+":"+strconv.Itoa(cl.OrigLoc.Line)
 	return cl.OrigLoc.Filename+":"+strconv.Itoa(cl.OrigLoc.Line)
 }
 
@@ -38,15 +40,21 @@ func (cl *CodeLocation) String() string{
 
 
 // Identify Concurrency Usage locations
-func Identify(app *App) []*ConcurrencyUsage{
+func Identify(path string) []*ConcurrencyUsage{
 	// Vars
 	var astfiles             []*ast.File
 	var commclauses          []string
 	var codeloc              *CodeLocation
 	var concusage            []*ConcurrencyUsage
+	var conf                 loader.Config
 
-	prog, err := app.Conf.Load()
+  // load program files
+	paths,err := filepath.Glob(path+"/*.go")
 	check(err)
+	if _, err := conf.FromArgs(paths, false); err != nil {
+		panic(err)
+	}
+  prog, err := conf.Load()
 
 	for _,crt := range(prog.Created){
 		for _,ast := range(crt.Files){

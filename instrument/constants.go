@@ -24,6 +24,7 @@ const(
   BROADCAST
   SELECT
   RANGE
+  COUNT
 )
 
 var selectorIdents = []string{
@@ -37,3 +38,22 @@ var selectorIdents = []string{
   "Signal",
   "Broadcast",
   "Done"}
+
+
+var concTypeDescription = [COUNT]string{
+  "LOCK",
+  "UNLOCK",
+  "RLOCK",
+  "RUNLOCK",
+  "SEND",
+  "RECV",
+  "CLOSE",
+  "GO",
+  "WAIT",
+  "ADD",
+  "DONE",
+  "SIGNAL",
+  "BROADCAST",
+  "SELECT",
+  "RANGE",
+}

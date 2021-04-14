@@ -8,56 +8,26 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"golang.org/x/tools/go/ast/astutil"
-	_"log"
+	"golang.org/x/tools/go/loader"
 	"strconv"
-	_"reflect"
-	"fmt"
 	"strings"
-  "os"
 )
 
 const MAXPROCS = 4
 
-func NewInstrumentedApp(app *App, concusage []*ConcurrencyUsage,traceOnly bool) (iapp *App){
-  var newPath,newName string
-  newName =app.Name
-  // create placeholder folder for instrumented app
-  if ws := os.Getenv("GOATWS");ws!="" {
-		if traceOnly{
-			newPath = ws+"/"+newName+"_0"
-		}else{
-			newPath = ws+"/"+newName
-		}
 
-    err := os.MkdirAll(newPath,os.ModePerm)
-  	check(err)
-  }else{
-    panic("GOATWS is not set!")
-  }
-
-	if traceOnly{
-		app.rewrite_traceOnly(newPath)
-	} else{
-		// we can rewrite differently each time
-	  app.rewrite_randomSched(newPath,concusage)
-	}
-
-
-  iapp = newApp(newName,newPath)
-  iapp.IsTest = app.IsTest
-  return iapp
-}
-
-func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage) []string{
+func rewrite_randomSched(origpath,newpath string, criticalPoints []*ConcurrencyUsage) []string{
   // Variables
   var astfiles    []*ast.File
   var ret         []string
+	var conf        loader.Config
+	var concfiles   []string
 
   // extract aux data
   conclines := make(map[string]int) // extract concurrency lines
   _concfiles := make(map[string]int) // extract concurrency files
-  var concfiles []string
-  for _,c := range(concusage){
+
+  for _,c := range(criticalPoints){
     conclines[c.OrigLoc.String()]=1
     _concfiles[c.OrigLoc.Filename] = 1
   }
@@ -66,7 +36,12 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage) 
   }
 
   // load program files
-  prog, err := app.Conf.Load()
+	paths,err := filepath.Glob(origpath+"/*.go")
+	check(err)
+	if _, err := conf.FromArgs(paths, false); err != nil {
+		panic(err)
+	}
+  prog, err := conf.Load()
 	check(err)
   for _,crt := range(prog.Created){
     for _,ast := range(crt.Files){
@@ -136,9 +111,6 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage) 
 
     // add other injections only to main/test file
     if mainIn(astFile) || testIn(astFile){
-      if testIn(astFile){
-        app.IsTest = true
-      }
 
       // add gomaxprocs and trace start/stop code
     	ast.Inspect(astFile, func(n ast.Node) bool {
@@ -175,26 +147,28 @@ func (app *App) rewrite_randomSched(path string, concusage []*ConcurrencyUsage) 
     var buf bytes.Buffer
   	err := printer.Fprint(&buf, prog.Fset, astFile)
   	check(err)
-    filename := filepath.Join(path, strings.Split(filepath.Base(prog.Fset.Position(astFile.Pos()).Filename),".")[0]+".go")
-    fmt.Println("AST Name",filename)
-    fmt.Println("App Name",app.Name)
+    filename := filepath.Join(newpath, strings.Split(filepath.Base(prog.Fset.Position(astFile.Pos()).Filename),".")[0]+".go")
     err = ioutil.WriteFile(filename, buf.Bytes(), 0666)
     check(err)
     ret = append(ret,filename)
   }
   return ret
-
-	/*
-	}*/
 }
 
 
-func (app *App) rewrite_traceOnly(path string) []string{
+func rewrite_traceOnly(origpath,newpath string) []string{
   // Variables
   var astfiles    []*ast.File
   var ret         []string
+	var conf        loader.Config
+
   // load program files
-  prog, err := app.Conf.Load()
+	paths,err := filepath.Glob(origpath+"/*.go")
+	check(err)
+	if _, err := conf.FromArgs(paths, false); err != nil {
+		panic(err)
+	}
+  prog, err := conf.Load()
 	check(err)
   for _,crt := range(prog.Created){
     for _,ast := range(crt.Files){
@@ -208,9 +182,9 @@ func (app *App) rewrite_traceOnly(path string) []string{
   //      add (at the end) GOAT_done <- true
   for _,astFile := range(astfiles){
     if mainIn(astFile) || testIn(astFile){
-      if testIn(astFile){
+      /*if testIn(astFile){
         app.IsTest = true
-      }
+      }*/
 			// add import
 			astutil.AddImport(prog.Fset, astFile, "github.com/staheri/goat/goat")
       // add goat start, stop, watch
@@ -244,7 +218,7 @@ func (app *App) rewrite_traceOnly(path string) []string{
     var buf bytes.Buffer
   	err := printer.Fprint(&buf, prog.Fset, astFile)
   	check(err)
-    filename := filepath.Join(path, strings.Split(filepath.Base(prog.Fset.Position(astFile.Pos()).Filename),".")[0]+".go")
+    filename := filepath.Join(newpath, strings.Split(filepath.Base(prog.Fset.Position(astFile.Pos()).Filename),".")[0]+".go")
     err = ioutil.WriteFile(filename, buf.Bytes(), 0666)
     check(err)
     ret = append(ret,filename)

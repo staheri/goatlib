@@ -3,7 +3,7 @@ package instrument
 import (
 	"go/ast"
 	"go/token"
-	"strconv"
+	//"strconv"
 )
 
 // returns "if Reschedule then Gosched()" line node
@@ -72,9 +72,9 @@ func astNode_goatStart(maxprocs int) *ast.AssignStmt{
 					X:   &ast.Ident{Name: "goat"},
 					Sel: &ast.Ident{Name: "Start"},
 				}, // args could be added here
-				Args : []ast.Expr{
-					&ast.BasicLit{Kind: token.INT, Value: strconv.Itoa(maxprocs)},
-				},
+				// Args : []ast.Expr{
+				// 	&ast.BasicLit{Kind: token.INT, Value: strconv.Itoa(maxprocs)},
+				// },
 			},
 		},
 	}
