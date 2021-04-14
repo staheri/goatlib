@@ -11,6 +11,7 @@ import (
 	"strings"
 	"github.com/staheri/goatlib/trace"
 	"strconv"
+	"path/filepath"
 )
 
 type Row struct{
@@ -33,11 +34,11 @@ func StackToString(frames []*trace.Frame) string{
 
 func ToString(f *trace.Frame) string {
 	fu := strings.Split(f.Fn,"/")
-	return fmt.Sprintf("%s:%d (%s)",f.File,f.Line,fu[len(fu)-1])
+	return fmt.Sprintf("%s @ %s:%d ",fu[len(fu)-1],filepath.Base(f.File),f.Line)
 }
 
 // Visualize execution
-func ExecVis(db *sql.DB, resultpath,dbName string, stacks map[uint64][]*trace.Frame) {
+func ExecVis(db *sql.DB, resultpath,dbName string, stacks map[uint64][]*trace.Frame, withStack bool) {
 
 	// Variables
 	var g,stack_id          uint64
@@ -109,15 +110,28 @@ func ExecVis(db *sql.DB, resultpath,dbName string, stacks map[uint64][]*trace.Fr
 	targetG := []*GInfo{}
 	targetG = append(targetG,&GInfo{id:0})
 	targetG = append(targetG,ginfo.main)
-	targetG = append(targetG,ginfo.app...)
+	targetG = append(targetG,ginfo.app[1:]...) // exclude watcher goroutine
 
 	gmatHeader := make([]string,len(targetG))
 	keepgs := []uint64{}
-	for i,gi := range(targetG){
+	for i := 0 ; i<len(targetG) ; i++{
+		gi := targetG[i]
 		if gi.createStack_id != 0 {
-			gmatHeader[i] = fmt.Sprintf("G%d\\n%v",gi.id,StackToString(stacks[gi.createStack_id]))
+			if i == 0 {
+				panic("wrong index")
+			}
+			if i == 1{
+				gmatHeader[i] = fmt.Sprintf("G%d\\nMAIN",gi.id)
+			} else{
+				if withStack{
+					gmatHeader[i] = fmt.Sprintf("G%d\\n%v",gi.id,StackToString(stacks[gi.createStack_id]))
+				} else{
+					gmatHeader[i] = fmt.Sprintf("G%d",gi.id)
+				}
+
+			}
 		} else{
-			gmatHeader[i] = fmt.Sprintf("G%d\\nRoot",gi.id)
+			gmatHeader[i] = fmt.Sprintf("G%d\\nROOT",gi.id)
 		}
 		keepgs = append(keepgs,gi.id)
 	}
@@ -136,12 +150,25 @@ func ExecVis(db *sql.DB, resultpath,dbName string, stacks map[uint64][]*trace.Fr
 				if dtab[idx].g == kg {
 					if !strings.HasPrefix(dtab[idx].rid,"G") && dtab[idx].rid != ""{
 						if dtab[idx].pos == 0{
-							gmatRow[i] = fmt.Sprintf("%v.(pre)%v\\n%v",dtab[idx].rid,dtab[idx].event,StackToString(stacks[dtab[idx].stack_id]))
+							if withStack{
+								gmatRow[i] = fmt.Sprintf("%v.(pre)%v\\n%v",dtab[idx].rid,dtab[idx].event,StackToString(stacks[dtab[idx].stack_id]))
+							}else{
+								gmatRow[i] = fmt.Sprintf("%v.(pre)%v",dtab[idx].rid,dtab[idx].event)
+							}
+
 						}else{
-							gmatRow[i] = fmt.Sprintf("%v.%v\\n%v",dtab[idx].rid,dtab[idx].event,StackToString(stacks[dtab[idx].stack_id]))
+							if withStack{
+								gmatRow[i] = fmt.Sprintf("%v.%v\\n%v",dtab[idx].rid,dtab[idx].event,StackToString(stacks[dtab[idx].stack_id]))
+							}else{
+								gmatRow[i] = fmt.Sprintf("%v.%v",dtab[idx].rid,dtab[idx].event)
+							}
 						}
 					}else{
-						gmatRow[i] = fmt.Sprintf("%v\\n%v",dtab[idx].event,StackToString(stacks[dtab[idx].stack_id]))
+						if withStack{
+							gmatRow[i] = fmt.Sprintf("%v\\n%v",dtab[idx].event,StackToString(stacks[dtab[idx].stack_id]))
+						}else{
+							gmatRow[i] = fmt.Sprintf("%v",dtab[idx].event)
+						}
 					}
 				}else{
 					gmatRow[i] = "-"
@@ -150,9 +177,16 @@ func ExecVis(db *sql.DB, resultpath,dbName string, stacks map[uint64][]*trace.Fr
 			gmat = append(gmat,gmatRow)
 		}
 	}
+	outdot := resultpath + "/" + dbName
+	outpdf := resultpath + "/" + dbName
+	if withStack{
+		outdot = outdot + "_fullvis.dot"
+		outpdf = outpdf + "_fullvis.pdf"
+	}else{
+		outdot = outdot + "_vis.dot"
+		outpdf = outpdf + "_vis.pdf"
+	}
 
-	outdot := resultpath + "/" + dbName + "_vis.dot"
-	outpdf := resultpath + "/" + dbName + "_vis.pdf"
 
 	//write dot file
 	f, err := os.Create(outdot)
@@ -161,7 +195,7 @@ func ExecVis(db *sql.DB, resultpath,dbName string, stacks map[uint64][]*trace.Fr
 	}
 
 
-	f.WriteString(mat2dot(gmat,gmatHeader))
+	f.WriteString(mat2dot(gmat,gmatHeader,withStack))
 	f.Close()
 
 	// start cmd

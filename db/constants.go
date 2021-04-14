@@ -179,4 +179,5 @@ type eventPredecessor struct{
 	clock    uint64
 }
 
-const STOREBOUND = 10000
+const STOREBOUND = 20000
+const EXECBOUND = 500

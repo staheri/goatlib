@@ -18,14 +18,12 @@ type GInfo struct{
 type GoroutineInfo struct{
 	main          *GInfo
 	trace        	*GInfo
-	watcher       *GInfo
 	app           []*GInfo
 }
 
 func (ginf *GoroutineInfo) String() string{
 	s := fmt.Sprintf("Main: %v\n",ginf.main.id)
 	s = s +  fmt.Sprintf("Trace: %v\n",ginf.trace.id)
-	s = s +  fmt.Sprintf("Watcher: %v\n",ginf.watcher.id)
 	for _,gi := range(ginf.app){
 		s = s +  fmt.Sprintf("App: %v\n",gi.id)
 	}
@@ -37,7 +35,7 @@ func storeIgnore(e *trace.Event) bool{
 	desc := EventDescriptions[e.Type]
 
 	// we do not want to ignore GoSched, no matter what
-	if desc.Name == "GoSched" || desc.Name == "GoCreate"{
+	if desc.Name == "GoSched" || desc.Name == "GoCreate" || desc.Name == "GoStart"{
 		return false
 	}
 
@@ -52,54 +50,47 @@ func storeIgnore(e *trace.Event) bool{
 
 func GetGoroutineInfo(db *sql.DB) GoroutineInfo{
 	var gs                GoroutineInfo
-	var linkoff           sql.NullInt32
 	var createStack_id    uint64
-	var offsets           []int
-	var g                 uint64
+	var parent_id         uint64
+	var notAppGs          []uint64
+	var appGs             []uint64
+	var allGs             []uint64
+	var gid               uint64
+	var funct             string
 
-	findGStmt,err := db.Prepare("SELECT t1.g,t2.createStack_id FROM Events t1 inner join goroutines t2 on t1.g=t2.gid WHERE t1.offset=?")
-	check(err)
-
+	create := make(map[uint64]uint64)
 
 	// Find G information
-	q := `Select linkoff from Events where type="EvGoCreate";`
+	q := `select gid,parent_id,createStack_id,func from Goroutines g1 INNER JOIN stackframes s1 ON g1.createStack_id=s1.stack_id where gid<>0 order by g1.id;`
 	res, err := db.Query(q)
 	check(err)
 	for res.Next(){
-		err = res.Scan(&linkoff)
-		if linkoff.Valid{
-			offsets = append(offsets,int(linkoff.Int32))
+		err = res.Scan(&gid,&parent_id,&createStack_id,&funct)
+		check(err)
+		allGs = append(allGs,gid)
+		create[gid]=createStack_id
+		if strings.HasPrefix(funct,"github.com/staheri/goat/goat.Start"){
+			// gid is not app-related
+			notAppGs = append(notAppGs,gid)
 		}
+		if strings.HasPrefix(funct,"runtime/trace.Start") && gs.trace == nil{
+			gs.trace = &GInfo{id:gid,createStack_id : createStack_id}
+			gs.main = &GInfo{id:parent_id,createStack_id : create[parent_id]}
+		}
+
 	}
 	res.Close()
+	for _,g := range(allGs){
+		if !containsUInt64(notAppGs,g){
+			if !containsUInt64(appGs,g){
+				appn := &GInfo{id:g,createStack_id : create[g]}
+				gs.app = append(gs.app,appn)
+				appGs = append(appGs,g)
+			}
 
-	for _,off := range(offsets){
-		res2, err2 := findGStmt.Query(off)
-		check(err2)
-		if res2.Next(){
-			err2 = res2.Scan(&g,&createStack_id)
-			if gs.main == nil{
-				gs.main = &GInfo{id:g,createStack_id : createStack_id}
-				res2.Close()
-				continue
-			}
-			if gs.trace == nil{
-				gs.trace = &GInfo{id:g,createStack_id : createStack_id}
-				res2.Close()
-				continue
-			}
-			if gs.watcher == nil{
-				gs.watcher = &GInfo{id:g,createStack_id : createStack_id}
-				res2.Close()
-				continue
-			}
-			appn := &GInfo{id:g,createStack_id : createStack_id}
-			gs.app = append(gs.app,appn)
 		}
-		res2.Close()
 	}
 
-	findGStmt.Close()
 	return gs
 }
 
@@ -216,11 +207,22 @@ func filterSlash(s string) string {
 	return ret
 }
 
-func mat2dot(mat [][]string, header []string) string{
+func mat2dot(mat [][]string, header []string, withStack bool) string{
 
-	width := "5"
-	height := "2"
-	fontsize := "11"
+	width := "0"
+	height := "0"
+	fontsize := "0"
+
+	if withStack{
+		width = "5"
+		height = "2"
+		fontsize = "11"
+	} else{
+		width = "0.6"
+		height = "0.3"
+		fontsize = "6"
+	}
+
 
 	if len(mat) < 1{
 		panic("Mat is empty")
@@ -251,7 +253,12 @@ func mat2dot(mat [][]string, header []string) string{
 	// For loop for all the subgraphs
 	for i,row := range(mat){
 		tmp = "\n\tsubgraph{"
-		tmp = tmp + "\n\t\tnode [margin=0 fontsize="+fontsize+" width="+width+" shape=box style=invis]"
+		if withStack{
+			tmp = tmp + "\n\t\tnode [margin=0 fontsize="+fontsize+" width="+width+" shape=box style=invis]"
+		}else{
+			tmp = tmp + "\n\t\tnode [margin=0 fontsize="+fontsize+" width="+width+" shape=circle style=invis]"
+		}
+
 		tmp = tmp + "\n\t\trank=same;"
 		tmp = tmp + "\n\t\trankdir=LR\n"
 		for j,el := range(row){
