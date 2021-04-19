@@ -184,21 +184,11 @@ func Checker(db *sql.DB, long bool) Report{
 	}
 	msg = msg + "===================================================================="
 
-	// ****************
-	// Generate report
-	//if long{
-	//	return longLeakReport(db,gs)
-	//}
 
-
-	colorReset := "\033[0m"
-	colorRed := "\033[31m"
-	//colorGreen := "\033[32m"
 	if isGlobalDL{
-		fmt.Println(string(colorRed),"Fail (global deadlock)",string(colorReset))
 		return Report{GlobalDL: true,Leaked:0, Message:msg, TotalG:totalg}
 	} else if len(suspicious) != 0{
-		fmt.Println(string(colorRed),"Fail (partial deadlock)",string(colorReset))
+		//fmt.Println(string(colorRed),"Fail (partial deadlock)",string(colorReset))
 		return Report{GlobalDL: false,Leaked:len(suspicious), Message:msg, TotalG:totalg}
 	}
 	//fmt.Println(string(colorGreen),"Pass",string(colorReset))

@@ -180,4 +180,4 @@ type eventPredecessor struct{
 }
 
 const STOREBOUND = 20000
-const EXECBOUND = 500
+const EXECBOUND = 100

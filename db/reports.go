@@ -87,24 +87,6 @@ func ExecVis(db *sql.DB, resultpath,dbName string, stacks map[uint64][]*trace.Fr
 	}
 	res.Close()
 
-	// obtain keepids
-	/*
-	curIgnore := 0
-	keepids := []int{}
-	for _,idx := range(allids){
-		if curIgnore == len(ignoreids){
-			keepids = append(keepids,idx)
-			continue
-		}
-		if idx < ignoreids[curIgnore]{
-			// include it
-			keepids = append(keepids,idx)
-		} else{
-				curIgnore++
-			}
-	}
-	*/
-
 	// create header row{}
 	ginfo := GetGoroutineInfo(db)
 	targetG := []*GInfo{}
@@ -215,19 +197,5 @@ func ExecVis(db *sql.DB, resultpath,dbName string, stacks map[uint64][]*trace.Fr
 	}
 	//log.Println(">>> ExecVis: Result: " + out.String())
 	// end cmd
-	fmt.Println("ExecVis: Generated visualization: ", outpdf)
-
-
-	/*_cmd = "open " + outpdf
-	cmd = exec.Command("open", outpdf)
-	log.Printf(">>> ExecVis: Opening %s...\n", _cmd)
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
-	if err != nil {
-		panic(fmt.Sprint(err) + ": " + stderr.String())
-		return
-	}
-	log.Println(">>> ExecVis: Result: " + out.String())*/
-
+	//fmt.Println("ExecVis: Generated visualization: ", outpdf)
 }

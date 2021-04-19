@@ -133,8 +133,16 @@ func DBExist(dbName string) (db *sql.DB,exist bool) {
 }
 
 
-// Operations on db
-func Clean() {
+// Drop dbName from database
+func DropDB(dbi *sql.DB,dbName string) bool{
+	q := "DROP DATABASE "+dbName+";"
+	_,err2 := dbi.Exec(q)
+	check(err2)
+	return true
+}
+
+// Clean all DB
+func DropDBAll() {
 	// Vars
 	var dbs,q string
 	// Connecting to mysql driver
