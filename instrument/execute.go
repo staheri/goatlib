@@ -5,28 +5,40 @@ import (
 	"errors"
 	"fmt"
   "io"
-	"io/ioutil"
+	_"strings"
 	"os"
 	"os/exec"
 	"log"
   "github.com/staheri/goatlib/trace"
+	"io/ioutil"
 )
 
-// build the path and return the binary name
-func BuildTest (path,buildID string) string{
-	var cmd *exec.Cmd
-  // create binary file holder
-  tmpBinary, err := ioutil.TempFile(path, "*"+buildID)
+// build from the files in sourceDir
+func BuildCommand (sourceDir,exMode,mode string, race bool) string{
+	//create binary file
+	tmpBinary, err := ioutil.TempFile(sourceDir,"*"+exMode)
   if err != nil {
     fmt.Println("create temp file error")
     panic(err)
   }
 
-  cmd = exec.Command("go", "test", "-c", "-o", tmpBinary.Name())
-
+	var cmd *exec.Cmd
+	if mode == "test"{
+		if race{
+			cmd = exec.Command("go","test","-race","-c","-o",tmpBinary.Name())
+		} else{
+			cmd = exec.Command("go","test","-c","-o",tmpBinary.Name())
+		}
+	}else { // mode = main
+		if race{
+			cmd = exec.Command("go","build","-race","-o",tmpBinary.Name())
+		} else{
+			cmd = exec.Command("go","build","-o",tmpBinary.Name())
+		}
+	}
   var stderr bytes.Buffer
   cmd.Stderr = &stderr
-  cmd.Dir = path
+  cmd.Dir = sourceDir
 
   err = cmd.Run()
   if err != nil {
@@ -36,29 +48,6 @@ func BuildTest (path,buildID string) string{
 	return tmpBinary.Name()
 }
 
-// build the path and return the binary name
-func BuildMain (path,buildID string) string {
-	var cmd *exec.Cmd
-  // create binary file holder
-  tmpBinary, err := ioutil.TempFile(path, "*"+buildID)
-  if err != nil {
-    fmt.Println("create temp file error")
-    panic(err)
-  }
-
-  cmd = exec.Command("go", "build", "-o", tmpBinary.Name())
-
-  var stderr bytes.Buffer
-  cmd.Stderr = &stderr
-  cmd.Dir = path
-
-  err = cmd.Run()
-  if err != nil {
-    fmt.Println("go build error", stderr.String())
-    panic(err)
-  }
-	return tmpBinary.Name()
-}
 
 // - executes the instrumented binary
 // - Parses collected trace
