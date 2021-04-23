@@ -155,16 +155,17 @@ var ctgDescriptions = [10]struct {
 
 
 const (
-	catGRTN         = 0  // Goroutine events
-	catCHNL         = 1  // Channel events
-	catWGCV         = 2  // WaitingGroup & Conditional Variable events
-	catMUTX         = 3  // Mutex events
-	catPROC         = 4  // Process events
-	catGCMM         = 5  // Garbage collection/memory events
-	catSYSC         = 6  // Syscall events
-	catMISC         = 7  // Other events
-	catBLCK         = 8  // Blocking events
-	catSCHD         = 9  // test-sched events
+	catGRTN         = iota  // Goroutine events
+	catCHNL                 // Channel events
+	catWGCV                 // WaitingGroup & Conditional Variable events
+	catMUTX                 // Mutex events
+	catPROC                 // Process events
+	catGCMM                 // Garbage collection/memory events
+	catSYSC                 // Syscall events
+	catMISC                 // Other events
+	catBLCK                 // Blocking events
+	catSCHD                 // test-sched events
+	catCNT                  // cat Count
 )
 
 
