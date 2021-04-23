@@ -199,3 +199,35 @@ func ExecVis(db *sql.DB, resultpath,dbName string, stacks map[uint64][]*trace.Fr
 	// end cmd
 	//fmt.Println("ExecVis: Generated visualization: ", outpdf)
 }
+
+
+func EventHistogram(db *sql.DB){
+	// Variables
+	var q, event string
+
+	data := []string{}
+	freq := make([]int,catCNT)
+	q = "SELECT type FROM events;"
+	res, err := db.Query(q)
+	check(err)
+	for res.Next() {
+		err = res.Scan(&event)
+		check(err)
+		data = append(data,event)
+	}
+	res.Close()
+
+	for _,ev := range(data){
+		for k := 0; k < catCNT; k++ {
+			if contains(ctgDescriptions[k].Members, ev) {
+				freq[k]++
+			}
+		}
+	}
+	s := ""
+	for i,f := range(freq){
+		s = s + fmt.Sprintf("%v: %v\n",ctgDescriptions[i].Category,f)
+	}
+	s = s + fmt.Sprintf("------\nTotal: %v\n------\n",len(data))
+	fmt.Println(s)
+}
