@@ -13,6 +13,11 @@ import (
 	"io/ioutil"
 )
 
+type ExecuteResult struct{
+	trace.ParseResult
+	ExecTime        time.Duration
+}
+
 // build from the files in sourceDir
 func BuildCommand (sourceDir,exMode,mode string, race bool) string{
 	//create binary file
@@ -51,23 +56,25 @@ func BuildCommand (sourceDir,exMode,mode string, race bool) string{
 
 // - executes the instrumented binary
 // - Parses collected trace
-func ExecuteTrace(binary string) (*trace.ParseResult, error){
+func ExecuteTrace(binary string, args ...string) (*ExecuteResult, error){
 	var stderr bytes.Buffer
 	var stdout bytes.Buffer
   var cmd *exec.Cmd
 	// run
 	log.Println("ExecuteTrace: Run ",binary)
-	cmd = exec.Command(binary)
+	cmd = exec.Command(binary,args...)
 	cmd.Stderr = &stderr
 	cmd.Stdout = &stdout
 
-
+	start := time.Now()
 	if err := cmd.Run(); err != nil {
 		fmt.Printf("modified program failed\nErr: %v\nStderr: %v\nStdout: %v\n", err, stderr.String(),stdout.String())
 		err1 := errors.New(fmt.Sprintf("%v",err))
 		err1 = fmt.Errorf("%v:%v",err,stderr.String())
 		return nil, err1
 	}
+	end := time.Now()
+	et := end.Sub(start)
 
 	// check length of stderr
 	if stderr.Len() == 0 {
@@ -75,8 +82,12 @@ func ExecuteTrace(binary string) (*trace.ParseResult, error){
 	}
 
 	// parse
-	log.Println("ExecuteTrace: Redirect stderr to ParseTrace ")
-	return parseTrace(&stderr, binary)
+	parseRes, err := parseTrace(&stderr, binary)
+	if err != nil{
+		return nil, err
+	}
+	ret := &ExecuteResult{parseRes,et}
+	return ret,nil
 }
 
 // removes dir
