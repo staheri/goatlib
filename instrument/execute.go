@@ -4,24 +4,23 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-  "io"
-	_"strings"
+	"time"
 	"os"
 	"os/exec"
 	"log"
-  "github.com/staheri/goatlib/trace"
 	"io/ioutil"
+	"path/filepath"
 )
 
 type ExecuteResult struct{
-	trace.ParseResult
+	TraceBuffer     *bytes.Buffer
 	ExecTime        time.Duration
 }
 
 // build from the files in sourceDir
-func BuildCommand (sourceDir,exMode,mode string, race bool) string{
+func BuildCommand (sourceDir,destDir,exMode,mode string, race bool) string{
 	//create binary file
-	tmpBinary, err := ioutil.TempFile(sourceDir,"*"+exMode)
+	tmpBinary, err := ioutil.TempFile(destDir,"*"+exMode)
   if err != nil {
     fmt.Println("create temp file error")
     panic(err)
@@ -50,7 +49,7 @@ func BuildCommand (sourceDir,exMode,mode string, race bool) string{
     fmt.Println("go build error", stderr.String())
     panic(err)
   }
-	return tmpBinary.Name()
+	return filepath.Base(tmpBinary.Name())
 }
 
 
@@ -68,10 +67,12 @@ func ExecuteTrace(binary string, args ...string) (*ExecuteResult, error){
 
 	start := time.Now()
 	if err := cmd.Run(); err != nil {
+		end := time.Now()
+		et := end.Sub(start)
 		fmt.Printf("modified program failed\nErr: %v\nStderr: %v\nStdout: %v\n", err, stderr.String(),stdout.String())
-		err1 := errors.New(fmt.Sprintf("%v",err))
-		err1 = fmt.Errorf("%v:%v",err,stderr.String())
-		return nil, err1
+		err1 := fmt.Errorf("%v:%v",err,stderr.String())
+		ret := &ExecuteResult{&stderr,et}
+		return ret, err1
 	}
 	end := time.Now()
 	et := end.Sub(start)
@@ -81,12 +82,7 @@ func ExecuteTrace(binary string, args ...string) (*ExecuteResult, error){
 		return nil, errors.New("empty trace")
 	}
 
-	// parse
-	parseRes, err := parseTrace(&stderr, binary)
-	if err != nil{
-		return nil, err
-	}
-	ret := &ExecuteResult{parseRes,et}
+	ret := &ExecuteResult{&stderr,et}
 	return ret,nil
 }
 
@@ -95,16 +91,4 @@ func removeDir(dir string) {
 	if err := os.RemoveAll(dir); err != nil {
 		fmt.Println("Cannot remove temp dir:", err)
 	}
-}
-
-// reads trace from stderr (io.reader) and parse
-func parseTrace(r io.Reader, binary string) (*trace.ParseResult, error) {
-	parseResult, err := trace.Parse(r,binary)
-	if err != nil {
-		return nil, err
-	}
-
-	err = trace.Symbolize(parseResult.Events, binary)
-
-	return &parseResult, err
 }
