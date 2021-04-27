@@ -33,16 +33,16 @@ func goCmd() string {
 
 // Event describes one event in the trace.
 type Event struct {
-	Off   int       // offset in input file (for debugging and error reporting)
-	Type  byte      // one of Ev*
-	Seq   int64     // sequence number //GOAT: changed from seq to Seq
-	Ts    int64     // timestamp in nanoseconds
-	P     int       // P on which the event happened (can be one of TimerP, NetpollP, SyscallP)
-	G     uint64    // G on which the event happened
-	StkID uint64    // unique stack ID
-	Stk   []*Frame  // stack trace (can be empty)
-	Args  [4]uint64 // event-type-specific arguments
-	SArgs []string  // event-type-specific string args
+	Off   int       `json:"offset"`          // offset in input file (for debugging and error reporting)
+	Type  byte      `json:"event"`           // one of Ev*
+	Seq   int64     `json:"seq"`             // sequence number //GOAT: changed from seq to Seq
+	Ts    int64     `json:"timestamp"`       // timestamp in nanoseconds
+	P     int       `json:"p"`               // P on which the event happened (can be one of TimerP, NetpollP, SyscallP)
+	G     uint64    `json:"g"`               // G on which the event happened
+	StkID uint64    `json:"stack_id"`        // unique stack ID
+	Stk   []*Frame  `json:"stack,omitempty"` // stack trace (can be empty)
+	Args  [4]uint64 `json:"args"`            // event-type-specific arguments
+	SArgs []string  `json:"sargs"`           // event-type-specific string args
 	// linked event (can be nil), depends on event type:
 	// for GCStart: the GCStop
 	// for GCSTWStart: the GCSTWDone
@@ -57,15 +57,15 @@ type Event struct {
 	// for GCMarkAssistStart: the associated GCMarkAssistDone
 	// for UserTaskCreate: the UserTaskEnd
 	// for UserRegion: if the start region, the corresponding UserRegion end event
-	Link *Event
+	Link *Event     `json:"-"`
 }
 
 // Frame is a frame in stack traces.
 type Frame struct {
-	PC   uint64
-	Fn   string
-	File string
-	Line int
+	PC   uint64     `json:"pc"`
+	Fn   string			`json:"function"`
+	File string			`json:"file"`
+	Line int				`json:"line"`
 }
 
 const (
@@ -80,9 +80,9 @@ const (
 // ParseResult is the result of Parse.
 type ParseResult struct {
 	// Events is the sorted list of Events in the trace.
-	Events []*Event
+	Events []*Event                `json:"events"`
 	// Stacks is the stack traces keyed by stack IDs from the trace.
-	Stacks map[uint64][]*Frame
+	Stacks map[uint64][]*Frame     `json:"stacks"`
 }
 
 // Parse parses, post-processes and verifies the trace.
