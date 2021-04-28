@@ -33,6 +33,7 @@ type Report struct{
 	Leaked        int
 	Message       string
 	TotalG        int
+	TotalCh       int
 }
 
 // a function to query the database
@@ -56,6 +57,7 @@ func Checker(db *sql.DB, long bool) Report{
 	var createStack_id  uint64
 	var event           string
 	var file,funct,line string
+	var totalch         int
 
 
 	lastEventMap := make(map[uint64]string)
@@ -74,13 +76,21 @@ func Checker(db *sql.DB, long bool) Report{
 	createLocStmt,err := db.Prepare("SELECT createStack_id FROM Goroutines WHERE gid=?")
 	check(err)
 
+	q := ("select COUNT(DISTINCT(rid)) from events where rid like \"C%\"")
+	res, err := db.Query(q)
+	check(err)
+	if res.Next(){
+		err = res.Scan(&totalch)
+		check(err)
+	}
+	res.Close()
 	// get goroutines information
 	gs := GetGoroutineInfo(db)
 	//fmt.Println(gs.String())
 
 
 	// check for global deadlock
-	res,err := lastEventStmt.Query(gs.main.id)
+	res,err = lastEventStmt.Query(gs.main.id)
 	check(err)
 	isGlobalDL = false
 	if res.Next(){
@@ -186,13 +196,13 @@ func Checker(db *sql.DB, long bool) Report{
 
 
 	if isGlobalDL{
-		return Report{GlobalDL: true,Leaked:0, Message:msg, TotalG:totalg}
+		return Report{GlobalDL: true,Leaked:0, Message:msg, TotalG:totalg, TotalCh: totalch}
 	} else if len(suspicious) != 0{
 		//fmt.Println(string(colorRed),"Fail (partial deadlock)",string(colorReset))
-		return Report{GlobalDL: false,Leaked:len(suspicious), Message:msg, TotalG:totalg}
+		return Report{GlobalDL: false,Leaked:len(suspicious), Message:msg, TotalG:totalg, TotalCh:totalch}
 	}
 	//fmt.Println(string(colorGreen),"Pass",string(colorReset))
-	return Report{GlobalDL: false,Leaked:0, Message:msg, TotalG:totalg}
+	return Report{GlobalDL: false,Leaked:0, Message:msg, TotalG:totalg,TotalCh:totalch}
 }
 
 func longLeakReport(db *sql.DB, gs GoroutineInfo) Report{

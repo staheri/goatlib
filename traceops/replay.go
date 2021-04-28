@@ -18,3 +18,17 @@ func ReplayDeadlockChecker(tracePath, binaryPath string) DLReport{
 
 	return DeadlockChecker(parseRes,false)
 }
+
+
+
+func ReplayDispGMAP(tracePath, binaryPath string) {
+	// obtain trace
+	trc,err := ReadTrace(tracePath)
+	check(err)
+
+	parseRes,err := trace.ParseTrace(trc,binaryPath)
+	check(err)
+	_,gmap := GetGoroutineInfo(parseRes)
+	GoroutineTable(gmap)
+	StackTable(parseRes.Stacks)
+}
