@@ -37,6 +37,7 @@ type GoroutineInfo struct{
   goat          []*GInfo
 }
 
+// returns goroutine info
 func GetGoroutineInfo(parseResult *trace.ParseResult) (GoroutineInfo , map[uint64]*GInfo){
 	var ret               GoroutineInfo
 	var notAppGs          []uint64
@@ -190,8 +191,7 @@ func GetGoroutineInfo(parseResult *trace.ParseResult) (GoroutineInfo , map[uint6
 	return ret,gmap
 }
 
-
-
+// convert stack trace ([]stack frames) to string
 func stackToString (frames []*trace.Frame) string{
 	s := ""
 	for i:= len(frames)-1 ; i>=0 ; i--{
@@ -200,15 +200,18 @@ func stackToString (frames []*trace.Frame) string{
 	return s
 }
 
+// convert stack frame to string (for execViz)
 func ToStringViz(f *trace.Frame) string {
 	fu := strings.Split(f.Fn,"/")
 	return fmt.Sprintf("%s @ %s:%d ",fu[len(fu)-1],filepath.Base(f.File),f.Line)
 }
 
+// convert stack frame to string
 func ToString(f *trace.Frame) string {
 	return fmt.Sprintf("%s\n\t%s:%d ",f.Fn,f.File,f.Line)
 }
 
+// returns individual ginfo string
 func (ginf *GInfo) String() string{
   s := fmt.Sprintf("G: %v\n",ginf.gid)
   s = s + fmt.Sprintf("Parent: %v\n",ginf.parent_id)
@@ -221,6 +224,7 @@ func (ginf *GInfo) String() string{
   return s
 }
 
+// returns a detail report of execution goroutine structure
 func (ginf *GoroutineInfo) StringDetail() string{
 	s := fmt.Sprintf("Main: \n%v\n",ginf.main.String())
 	s = s +  fmt.Sprintf("Trace: \n%v\n",ginf.trace.String())
@@ -233,7 +237,7 @@ func (ginf *GoroutineInfo) StringDetail() string{
 	return s
 }
 
-
+// returns a short report of execution goroutine structure
 func (ginf *GoroutineInfo) String() string{
 	s := fmt.Sprintf("Main: %v\n",ginf.main.gid)
 	s = s +  fmt.Sprintf("Trace: %v\n",ginf.trace.gid)
