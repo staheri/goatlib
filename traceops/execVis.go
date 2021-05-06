@@ -21,6 +21,48 @@ type Row struct{
 	stack_id          uint64
 }
 
+var recvPos = map[int]string{
+  0 : "blocked",
+  1 : "roc", // receive on closed
+  2 : "buf-dir", // buffered channel - directly from queue
+  3 : "woken-up",
+  4 : "sr-buf",
+  5 : "sel-sr-rs?", // select, receive ready, case sent is selected
+  6 : "sel-roc?", // select, receive ready, case sent is selected
+}
+
+var sendPos = map[int]string{
+  0 : "blocked",
+  1 : "none",
+  2 : "woken-up",
+  3 : "rr",
+  4 : "sel-rr-ss?", // select, receive ready, case sent is selected
+}
+
+var selectPos = map[int]string{
+  0 : "all",
+  1 : "nb-send",
+  2 : "nb-recv",
+  3 : "nb-recv2",
+}
+
+var muPos = map[int]string{
+  0 : "locked",
+  1 : "free",
+  2 : "woken-up",
+}
+
+var wgPos = map[int]string{
+  0 : "blocked",
+  1 : "free",
+  2 : "woken-up",
+}
+
+var cvPos = map[int]string{
+  0 : "none",
+  1 : "sig",
+  2 : "brdcst",
+}
 
 var (
   chEvents = []string{"ChMake","ChClose","ChSend","ChRecv"}
@@ -95,9 +137,9 @@ func ExecVis(tracePath, binaryPath,resultPathName string, withStack bool) {
 
 
   for _,e := range(parseRes.Events){
-    fmt.Println(e.String())
+    //fmt.Println(e.String())
     // init
-    var rid             string
+    var rid,_pos        string
     var wgVal           int
     pos := -1           // default for pos
     ed := trace.EventDescriptions[e.Type]
@@ -119,30 +161,43 @@ func ExecVis(tracePath, binaryPath,resultPathName string, withStack bool) {
 
     if contains(chEvents,ed.Name){
       rid = fmt.Sprintf("Ch(%v)",e.Args[0]) // args[0] for channel is cid
-      if ed.Name == "ChRecv" || ed.Name == "ChSend"{
-        pos = int(e.Args[3]) // args[3] for channel.send/recv is pos
-        rid = fmt.Sprintf("Ch(%v)[%v]",e.Args[0],e.Args[3]) // include pos in rid
+      if ed.Name == "ChRecv" {
+        pos = int(e.Args[3])
+        _pos = recvPos[pos] // args[3] for channel.send/recv is pos
+        rid = fmt.Sprintf("Ch(%v)[%v]",e.Args[0],_pos) // include pos in rid
+      }else if ed.Name == "ChSend"{
+        pos = int(e.Args[3])
+        _pos = sendPos[pos] // args[3] for channel.send/recv is pos
+        rid = fmt.Sprintf("Ch(%v)[%v]",e.Args[0],_pos) // include pos in rid
       }
     }else if contains(muEvents,ed.Name){
       rid = fmt.Sprintf("Mu(%v)",e.Args[0]) // args[0] for mutex is mu id
       if ed.Name == "MuLock" {
         pos = int(e.Args[1]) // args[1] for mutex.lock is pos
+        _pos = muPos[pos]
+        rid = fmt.Sprintf("Mu(%v)[%v]",e.Args[0],_pos) // args[0] for mutex is mu id
       }
     }else if contains(cvEvents,ed.Name){
       rid = fmt.Sprintf("Cv(%v)",e.Args[0]) // args[0] for cond var is cv id
       if ed.Name == "CvSig" {
         pos = int(e.Args[1]) // args[1] for cond var is pos
+        _pos = cvPos[pos]
+        rid = fmt.Sprintf("Cv(%v)[%v]",e.Args[0],_pos) // args[0] for cond var is cv id
       }
     }else if contains(wgEvents,ed.Name){
       rid = fmt.Sprintf("Wg(%v)",e.Args[0]) // args[0] for WaitGroup is wg id
       if ed.Name == "WgAdd" {
         wgVal = int(e.Args[1]) // args[1] for wgAdd is val
+        rid = fmt.Sprintf("Wg(%v)[val:%v]",e.Args[0],wgVal) // args[0] for WaitGroup is wg id
       }else{
         pos = int(e.Args[1]) // args[1] for wgWait is pos
+        _pos = wgPos[pos]
+        rid = fmt.Sprintf("Wg(%v)[%v]",e.Args[0],_pos) // args[0] for cond var is cv id
       }
     } else if contains(ssEvents,ed.Name){
-      rid = fmt.Sprintf("SS(%v)",e.Args[0]) // args[0] for SS is pos
       pos = int(e.Args[0]) // args[0] for ss is pos
+      _pos = selectPos[pos]
+      rid = fmt.Sprintf("SS(%v)[%v]",e.Args[0],_pos) // args[0] for SS is pos
     }
 
     // ignore based on E.stack (ignore goat events)
@@ -156,20 +211,11 @@ func ExecVis(tracePath, binaryPath,resultPathName string, withStack bool) {
             }else{
               gmatRow[i] = fmt.Sprintf("%v.(pre)%v",rid,ed.Name)
             }
-
           }else{
             if withStack{
-              if wgVal != 0{
-                gmatRow[i] = fmt.Sprintf("%v.%v(val:%d)\\n%v",rid,ed.Name,wgVal,stackToString(e.Stk,true))
-              } else{
-                gmatRow[i] = fmt.Sprintf("%v.%v\\n%v",rid,ed.Name,stackToString(e.Stk,true))
-              }
+              gmatRow[i] = fmt.Sprintf("%v.%v\\n%v",rid,ed.Name,stackToString(e.Stk,true))
             }else{
-              if wgVal != 0{
-                gmatRow[i] = fmt.Sprintf("%v.%v(%v)",rid,ed.Name,wgVal)
-              }else{
-                gmatRow[i] = fmt.Sprintf("%v.%v",rid,ed.Name)
-              }
+              gmatRow[i] = fmt.Sprintf("%v.%v",rid,ed.Name)
             }
           }
         }else{
