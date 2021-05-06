@@ -10,9 +10,8 @@ import(
 )
 
 type ConcurrencyUsage struct{
-	Type              int
-	OrigLoc           *CodeLocation
-	NewLoc            *CodeLocation
+	Type              int                   `json:"type"`
+	OrigLoc           *CodeLocation         `json:"concusage"`
 }
 
 func newConcurrencyUsage(typ int, codeloc *CodeLocation) *ConcurrencyUsage{
@@ -25,9 +24,9 @@ func (cl *ConcurrencyUsage) String() string{
 }
 
 type CodeLocation struct{
-	Filename              string
-	Function              string // will be empty in static instrumentation, will be updated duirng dynamic executions
-	Line                  int
+	Filename              string          `json:"filename"`
+	Function              string          `json:"function,omitempty"`   // will be empty in static instrumentation, will be updated duirng dynamic executions
+	Line                  int             `json:"line"`
 }
 
 func newCodeLocation(file string, line int) *CodeLocation {
@@ -152,6 +151,25 @@ func Identify(path string) []*ConcurrencyUsage{
   							return true
   					}
           }
+
+				// recvs in return
+				case *ast.ReturnStmt:
+					rs := n.(*ast.ReturnStmt)
+					rsres := rs.Results
+					for _,expr := range(rsres){
+						switch y := expr.(type){
+							case *ast.UnaryExpr:
+								ux := expr.(*ast.UnaryExpr)
+								if !contains(commclauses,codeloc.String()) && ux.Op == token.ARROW{
+									concusage = append(concusage,newConcurrencyUsage(RECV,codeloc))
+									return false
+								}
+								return true
+							default:
+								_ = y
+								return true
+						}
+					}
 
 
 				// ChRecv (with no assignment)
