@@ -192,10 +192,15 @@ func GetGoroutineInfo(parseResult *trace.ParseResult) (GoroutineInfo , map[uint6
 }
 
 // convert stack trace ([]stack frames) to string
-func stackToString (frames []*trace.Frame) string{
+func stackToString (frames []*trace.Frame, isViz bool) string{
 	s := ""
 	for i:= len(frames)-1 ; i>=0 ; i--{
-		s = s + fmt.Sprintf("%v\n",ToString(frames[i]))
+		if isViz{
+			s = s + fmt.Sprintf("%v\n",ToStringViz(frames[i]))
+		} else{
+			s = s + fmt.Sprintf("%v\n",ToString(frames[i]))
+		}
+
 	}
 	return s
 }
@@ -217,7 +222,7 @@ func (ginf *GInfo) String() string{
   s = s + fmt.Sprintf("Parent: %v\n",ginf.parent_id)
   s = s + fmt.Sprintf("Ended: %v\n",ginf.ended)
 	s = s + fmt.Sprintf("Type: %v\n",gtypes[ginf.gtype])
-  s = s + fmt.Sprintf("Create StackFrame:\n%v\n",stackToString(ginf.createStack_frame))
+  s = s + fmt.Sprintf("Create StackFrame:\n%v\n",stackToString(ginf.createStack_frame,false))
 	if ginf.lastEvent != nil{
 		s = s + fmt.Sprintf("Last Event: %v\n",trace.EventDescriptions[ginf.lastEvent.Type])
 	}

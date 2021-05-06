@@ -1,13 +1,11 @@
 package traceops
 
 import (
-	_ "github.com/go-sql-driver/mysql"
-	_"strconv"
   "github.com/staheri/goatlib/trace"
-	_"path/filepath"
 )
 
 
+// read trace and check if it deadlocks
 func ReplayDeadlockChecker(tracePath, binaryPath string) DLReport{
 	// obtain trace
 	trc,err := ReadTrace(tracePath)
@@ -19,8 +17,7 @@ func ReplayDeadlockChecker(tracePath, binaryPath string) DLReport{
 	return DeadlockChecker(parseRes,false)
 }
 
-
-
+// read trace and display its goroutines and stacks
 func ReplayDispGMAP(tracePath, binaryPath string) {
 	// obtain trace
 	trc,err := ReadTrace(tracePath)

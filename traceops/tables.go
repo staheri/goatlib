@@ -12,7 +12,7 @@ import (
   "strconv"
 )
 
-
+// print stack table
 func StackTable (stackFrames map[uint64][]*trace.Frame) {
   var allIDs []uint64
 
@@ -46,7 +46,7 @@ func StackTable (stackFrames map[uint64][]*trace.Frame) {
   t.Render()
 }
 
-
+// print goroutine table
 func GoroutineTable (gmap map[uint64]*GInfo) {
   var allGs []uint64
 
