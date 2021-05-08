@@ -40,7 +40,7 @@ var selectorIdents = []string{
   "Done"}
 
 
-var concTypeDescription = [COUNT]string{
+var ConcTypeDescription = [COUNT]string{
   "LOCK",
   "UNLOCK",
   "RLOCK",
