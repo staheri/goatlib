@@ -21,65 +21,6 @@ type Row struct{
 	stack_id          uint64
 }
 
-var recvPos = map[int]string{
-  0 : "blocked",
-  1 : "roc", // receive on closed
-  2 : "buf-dir", // buffered channel - directly from queue
-  3 : "woken-up",
-  4 : "sr-buf",
-  5 : "sel-sr-rs?", // select, receive ready, case sent is selected
-  6 : "sel-roc?", // select, receive ready, case sent is selected
-}
-
-var sendPos = map[int]string{
-  0 : "blocked",
-  1 : "none",
-  2 : "woken-up",
-  3 : "rr",
-  4 : "sel-rr-ss?", // select, receive ready, case sent is selected
-}
-
-var selectPos = map[int]string{
-  0 : "all",
-  1 : "nb-send",
-  2 : "nb-recv",
-  3 : "nb-recv2",
-}
-
-var muPos = map[int]string{
-  0 : "locked",
-  1 : "free",
-  2 : "woken-up",
-}
-
-var wgPos = map[int]string{
-  0 : "blocked",
-  1 : "free",
-  2 : "woken-up",
-}
-
-var cvPos = map[int]string{
-  0 : "none",
-  1 : "sig",
-  2 : "brdcst",
-}
-
-var (
-  chEvents = []string{"ChMake","ChClose","ChSend","ChRecv"}
-  muEvents = []string{"MuLock","MuUnlock"}
-  cvEvents = []string{"CvWait","CvSig"}
-  wgEvents = []string{"WgWait","WgAdd"}
-  ssEvents = []string{"Select","Sched"}
-
-  catGRTN  = []string{"GoCreate","GoStart","GoEnd","GoStop","GoSched","GoPreempt","GoSleep","GoBlock","GoUnblock","GoBlockSend","GoBlockRecv","GoBlockSelect","GoBlockSync","GoBlockCond","GoBlockNet","GoWaiting","GoInSyscall","GoStartLocal","GoUnblockLocal","GoSysExitLocal","GoStartLabel","GoBlockGC"}
-	catBLCK  = []string{"GoCreate","GoStart","GoEnd","GoStop","GoSched","GoPreempt","GoSleep","GoBlock","GoUnblock","GoBlockSend","GoBlockRecv","GoBlockSelect","GoBlockSync","GoBlockCond","GoBlockNet","GoUnblockLocal","GoBlockGC"}
-  catPROC  = []string{"None","Batch","Frequency","Stack","Gomaxprocs","ProcStart","ProcStop"}
-  catGCMM  = []string{"GCStart","GCDone","GCSTWStart","GCSTWDone","GCSweepStart","GCSweepDone","HeapAlloc","NextGC","GCMarkAssistStart","GCMarkAssistDone"}
-  catSYSC  = []string{"GoSysCall","GoSysExit","GoSysBlock"}
-  catMISC  = []string{"UserTaskCreate","UserTaskEnd","UserRegion","UserLog","TimerGoroutine","FutileWakeup","String"}
-  interestingEvents = [][]string{chEvents,muEvents,cvEvents,wgEvents,ssEvents,catBLCK}
-  iEvents  = []string{}
-)
 
 
 
