@@ -2,8 +2,7 @@ package traceops
 
 import (
 	"fmt"
-	_"strings"
-
+	"strings"
 	_ "github.com/go-sql-driver/mysql"
 	_"strconv"
   "github.com/staheri/goatlib/trace"
@@ -54,7 +53,8 @@ func MeasureCoverage(parseResult *trace.ParseResult, concUsage []*instrument.Con
 	fmt.Println(concStackIDs)
 	t := table.NewWriter()
   t.SetOutputMirror(os.Stdout)
-  t.AppendHeader(table.Row{"Stack ID","File","Function","Line","Event","CU Event","Position"})
+  //t.AppendHeader(table.Row{"Stack ID","File","Function","Line","Event","CU Event","Position"})
+	t.AppendHeader(table.Row{"Stack ID","Function","Line","Event","G","CU Event","Position"})
 
 	for _,e := range(parseResult.Events){
 		fmt.Println(e.String())
@@ -63,12 +63,31 @@ func MeasureCoverage(parseResult *trace.ParseResult, concUsage []*instrument.Con
 		// check for concurrency usage
 		if containsUInt64(concStackIDs,e.StkID){
 			fmt.Printf("***CONC***\n-------\n")
+			switch concStackTable[e.StkID].Type{
+			case instrument.LOCK, instrument.UNLOCK, instrument.RUNLOCK, instrument.RLOCK:
+				if !strings.HasPrefix(ed.Name,"Mu") && !contains(CatBLCK,ed.Name){
+					continue
+				}
+			case instrument.SEND, instrument.RECV, instrument.CLOSE:
+				if !strings.HasPrefix(ed.Name,"Ch") && !contains(CatBLCK,ed.Name){
+					continue
+				}
+			case instrument.SELECT:
+				if !strings.HasPrefix(ed.Name,"Select") && !contains(CatBLCK,ed.Name){
+					continue
+				}
+			case instrument.GO:
+				if !strings.HasPrefix(ed.Name,"Go") && !contains(CatBLCK,ed.Name){
+					continue
+				}
+			}
 			var row []interface{}
 			row = append(row,e.StkID)
-			row = append(row,concStackTable[e.StkID].OrigLoc.Filename)
+			//row = append(row,concStackTable[e.StkID].OrigLoc.Filename)
 			row = append(row,concStackTable[e.StkID].OrigLoc.Function)
 			row = append(row,concStackTable[e.StkID].OrigLoc.Line)
 			row = append(row,ed.Name)
+			row = append(row,e.G)
 			row = append(row,instrument.ConcTypeDescription[concStackTable[e.StkID].Type])
 			row = append(row,GetPositionDesc(e))
 			t.AppendRow(row)
