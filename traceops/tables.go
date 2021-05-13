@@ -63,16 +63,16 @@ func GoroutineTable (gmap map[uint64]*GInfo) {
   for _,gid := range(allGs){
     var row []interface{}
     row = append(row,gid)
-    row = append(row,gmap[gid].parent_id)
-    row = append(row,gmap[gid].createStack_id)
-    row = append(row,gtypes[gmap[gid].gtype])
-    if gmap[gid].lastEvent != nil{
-      row = append(row,trace.EventDescriptions[gmap[gid].lastEvent.Type].Name)
+    row = append(row,gmap[gid].Parent_id)
+    row = append(row,gmap[gid].CreateStack_id)
+    row = append(row,gtypes[gmap[gid].Gtype])
+    if len(gmap[gid].Events) != 0{
+      row = append(row,trace.EventDescriptions[gmap[gid].Events[len(gmap[gid].Events)-1].Type].Name)
     }else{
       row = append(row,"NULL")
     }
 
-    row = append(row,gmap[gid].ended)
+    row = append(row,gmap[gid].Ended)
     t.AppendRow(row)
   }
   t.Render()

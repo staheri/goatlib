@@ -36,35 +36,35 @@ func ExecVis(tracePath, binaryPath,resultPathName string, withStack bool) {
 
   parseRes,err := trace.ParseTrace(trc,binaryPath)
   check(err)
-  ginfo,gmap := GetGoroutineInfo(parseRes)
+  ginfo,gmap,_ := GetGoroutineInfo(parseRes)
   GoroutineTable(gmap)
   //StackTable(parseRes.Stacks)
 
   targetG := []*GInfo{}
 	targetG = append(targetG,gmap[0])
-	targetG = append(targetG,ginfo.main)
-	targetG = append(targetG,ginfo.app...) // ignoe goat_watch
+	targetG = append(targetG,ginfo.Main)
+	targetG = append(targetG,ginfo.App...) // ignoe goat_watch
   targetGuint := []uint64{}
 
   gmatHeader := make([]string,len(targetG))
   for i := 0 ; i<len(targetG) ; i++{
     gi := targetG[i]
-    targetGuint = append(targetGuint,gi.gid)
-    if gi.createStack_id != 0 {
+    targetGuint = append(targetGuint,gi.Gid)
+    if gi.CreateStack_id != 0 {
       if i == 0 {
         panic("wrong index")
       }
       if i == 1{
-        gmatHeader[i] = fmt.Sprintf("G%d\\nMAIN",gi.gid)
+        gmatHeader[i] = fmt.Sprintf("G%d\\nMAIN",gi.Gid)
       } else{
         if withStack{
-          gmatHeader[i] = fmt.Sprintf("G%d\\n%v",gi.gid,stackToString(parseRes.Stacks[gi.createStack_id],true)) // isViz: true
+          gmatHeader[i] = fmt.Sprintf("G%d\\n%v",gi.Gid,stackToString(parseRes.Stacks[gi.CreateStack_id],true)) // isViz: true
         } else{
-          gmatHeader[i] = fmt.Sprintf("G%d",gi.gid)
+          gmatHeader[i] = fmt.Sprintf("G%d",gi.Gid)
         }
       }
     } else{
-      gmatHeader[i] = fmt.Sprintf("G%d\\nROOT",gi.gid)
+      gmatHeader[i] = fmt.Sprintf("G%d\\nROOT",gi.Gid)
     }
   }
 

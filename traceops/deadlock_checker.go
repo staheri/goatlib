@@ -36,10 +36,10 @@ func DeadlockChecker(parseResult *trace.ParseResult, long bool) DLReport{
 	rep := DLReport{}
 	var leaked []uint64
 
-	gs,gmap := GetGoroutineInfo(parseResult)
+	gs,gmap,_ := GetGoroutineInfo(parseResult)
 	//gs := GetGoroutineInfo(parseResult)
 	//fmt.Println(gs.StringDetail())
-	//GoroutineTable(gmap)
+	GoroutineTable(gmap)
 
 	leakedMsg := ""
 
@@ -47,34 +47,34 @@ func DeadlockChecker(parseResult *trace.ParseResult, long bool) DLReport{
 	isViz := false
 
 	// check for global deadlock
-	// check the last event of main
-	if gs.main.lastEvent == nil{
+	// check the last event of Main
+	if len(gs.Main.Events) == 0{
 		rep.GlobalDL = true
-		leaked = append(leaked,gs.main.gid)
-		leakedMsg = leakedMsg + fmt.Sprintf(MessagePerLeaked,gs.main.gid,"ROOT","NULL","NULL")
-	} else if trace.EventDescriptions[gs.main.lastEvent.Type].Name != "GoSched"{
+		leaked = append(leaked,gs.Main.Gid)
+		leakedMsg = leakedMsg + fmt.Sprintf(MessagePerLeaked,gs.Main.Gid,"ROOT","NULL","NULL")
+	} else if trace.EventDescriptions[gs.Main.Events[len(gs.Main.Events)-1].Type].Name != "GoSched"{
 		rep.GlobalDL = true
-		leaked = append(leaked,gs.main.gid)
-		leakedMsg = leakedMsg + fmt.Sprintf(MessagePerLeaked,gs.main.gid,"ROOT",trace.EventDescriptions[gs.main.lastEvent.Type].Name,stackToString(gs.main.lastEvent.Stk,isViz))
+		leaked = append(leaked,gs.Main.Gid)
+		leakedMsg = leakedMsg + fmt.Sprintf(MessagePerLeaked,gs.Main.Gid,"ROOT",trace.EventDescriptions[gs.Main.Events[len(gs.Main.Events)-1].Type].Name,stackToString(gs.Main.Events[len(gs.Main.Events)-1].Stk,isViz))
 	}
 	if !rep.GlobalDL{
-		if !strings.HasPrefix(gs.main.lastEvent.Stk[0].Fn,"runtime.StopTrace"){
+		if !strings.HasPrefix(gs.Main.Events[len(gs.Main.Events)-1].Stk[0].Fn,"runtime.StopTrace"){
 			rep.GlobalDL = true
-			leaked = append(leaked,gs.main.gid)
-			leakedMsg = leakedMsg + fmt.Sprintf(MessagePerLeaked,gs.main.gid,"ROOT",trace.EventDescriptions[gs.main.lastEvent.Type].Name,stackToString(gs.main.lastEvent.Stk,isViz))
+			leaked = append(leaked,gs.Main.Gid)
+			leakedMsg = leakedMsg + fmt.Sprintf(MessagePerLeaked,gs.Main.Gid,"ROOT",trace.EventDescriptions[gs.Main.Events[len(gs.Main.Events)-1].Type].Name,stackToString(gs.Main.Events[len(gs.Main.Events)-1].Stk,isViz))
 		}
 	}
 
-	for _,gi := range(gs.app){
+	for _,gi := range(gs.App){
 		//fmt.Println("TEST")
 		//fmt.Println(gi.lastEvent.String())
 		//fmt.Println("APP G LastEVENT Type",gi.lastEvent.Type)
-		if gi.lastEvent == nil{
-			leaked = append(leaked,gi.gid)
-			leakedMsg = leakedMsg + fmt.Sprintf(MessagePerLeaked,gi.gid,stackToString(parseResult.Stacks[gi.createStack_id],isViz),"NULL","NULL")
-		}else if trace.EventDescriptions[gi.lastEvent.Type].Name != "GoEnd"{
-			leaked = append(leaked,gi.gid)
-			leakedMsg = leakedMsg + fmt.Sprintf(MessagePerLeaked,gi.gid,stackToString(parseResult.Stacks[gi.createStack_id],isViz),trace.EventDescriptions[gi.lastEvent.Type].Name,stackToString(gi.lastEvent.Stk,isViz))
+		if len(gi.Events) == 0{
+			leaked = append(leaked,gi.Gid)
+			leakedMsg = leakedMsg + fmt.Sprintf(MessagePerLeaked,gi.Gid,stackToString(parseResult.Stacks[gi.CreateStack_id],isViz),"NULL","NULL")
+		}else if trace.EventDescriptions[gi.Events[len(gi.Events)-1].Type].Name != "GoEnd"{
+			leaked = append(leaked,gi.Gid)
+			leakedMsg = leakedMsg + fmt.Sprintf(MessagePerLeaked,gi.Gid,stackToString(parseResult.Stacks[gi.CreateStack_id],isViz),trace.EventDescriptions[gi.Events[len(gi.Events)-1].Type].Name,stackToString(gi.Events[len(gi.Events)-1].Stk,isViz))
 		}
 	}
 

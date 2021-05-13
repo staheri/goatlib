@@ -25,7 +25,7 @@ func ReplayDispGMAP(tracePath, binaryPath string) {
 
 	parseRes,err := trace.ParseTrace(trc,binaryPath)
 	check(err)
-	_,gmap := GetGoroutineInfo(parseRes)
+	_,gmap,_ := GetGoroutineInfo(parseRes)
 	GoroutineTable(gmap)
 	StackTable(parseRes.Stacks)
 }
