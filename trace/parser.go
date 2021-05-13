@@ -1068,19 +1068,20 @@ const (
 	EvUserTaskEnd       = 46 // end of task [timestamp, internal task id, stack]
 	EvUserRegion        = 47 // trace.WithRegion [timestamp, internal task id, mode(0:start, 1:end), stack, name string]
 	EvUserLog           = 48 // trace.Log [timestamp, internal id, key string id, stack, value string]
-	EvChSend            = 49 // GOAT: chan send [timestamp, stack, channel id, ch_event id, value, pos]
-	EvChRecv            = 50 // GOAT: chan recv [timestamp, stack, channel id, ch_event id, value, pos]
-	EvChMake            = 51 // GOAT: chan make [timestamp, stack, channel id]
-	EvChClose           = 52 // GOAT: chan close [timestamp, stack, channel id]
-	EvWgAdd             = 53 // GOAT: wg add (and inited) [timestamp, stack, wg id, value]
-	EvWgWait            = 54 // GOAT: wg wait [timestamp, stack, wg id, pos]
-	EvMuLock            = 55 // GOAT: mu lock [timestamp, stack, mu id, pos]
-	EvMuUnlock          = 56 // GOAT: mu unlock [timestamp, stack, mu id]
-	EvSelect            = 57 // GOAT: select [timestamp, stack, pos]
-	EvSched             = 58 // GOAT: sched [timestamp, stack, pos, curg, aux]
-	EvCvWait            = 59 // GOAT: cond var wait [timestamp, stack, cv id]
-  EvCvSig             = 60 // GOAT: cond var signal [timestamp, stack, cv id, {1: signal, 2: broadcast}]
-	EvCount             = 61
+	EvChMake            = 49 // GOAT: chan make [timestamp, stack, channel id]
+	EvChSend            = 50 // GOAT: chan send [timestamp, stack, channel id, pos]
+  EvChRecv            = 51 // GOAT: chan recv [timestamp, stack, channel id, pos]
+  EvChClose           = 52 // GOAT: chan close [timestamp, stack, channel id]
+	EvMuLock            = 53 // GOAT: mu lock [timestamp, stack, mu id, pos]
+  EvMuUnlock          = 54 // GOAT: mu unlock [timestamp, stack, mu id]
+	EvWgAdd             = 55 // GOAT: wg add (and inited, also used for Done) [timestamp, stack, wg id, value, counter, #waiters]
+  EvWgWait            = 56 // GOAT: wg wait [timestamp, stack, wg id, pos]
+	EvCvWait            = 57 // GOAT: cond var wait [timestamp, stack, cv id]
+  EvCvSig             = 58 // GOAT: cond var signal [timestamp, stack, cv id, {1: signal, 2: broadcast}]
+  EvSelect            = 59 // GOAT: select [timestamp, stack, pos, casei, cid, kind]
+	EvSelecti           = 60 // GOAT: selecti [timestamp, stack, casei, polli, cidi, kindi]
+  EvSched             = 61 // GOAT: sched [timestamp, stack, pos, curg, aux]
+	EvCount             = 62
 )
 
 var EventDescriptions = [EvCount]struct {
@@ -1139,16 +1140,17 @@ var EventDescriptions = [EvCount]struct {
 	EvUserTaskEnd:       {"UserTaskEnd", 1011, true, []string{"taskid"}, nil},
 	EvUserRegion:        {"UserRegion", 1011, true, []string{"taskid", "mode", "typeid"}, []string{"name"}},
 	EvUserLog:           {"UserLog", 1011, true, []string{"id", "keyid"}, []string{"category", "message"}},
-	EvChSend:            {"ChSend", 1011, true, []string{"cid","chid","val","pos"},nil}, // GOAT: chan send [timestamp, stack, channel id, ch_event id, value, pos]
-	EvChRecv:            {"ChRecv", 1011, true, []string{"cid","chid","val","pos"},nil}, // GOAT: chan send [timestamp, stack, channel id, ch_event id, value, pos]
 	EvChMake:            {"ChMake", 1011, true, []string{"cid"},nil},// GOAT: chan make [timestamp, stack, channel id]
+	EvChSend:            {"ChSend", 1011, true, []string{"cid","pos"},nil}, // GOAT: chan send [timestamp, stack, channel id, pos]
+	EvChRecv:            {"ChRecv", 1011, true, []string{"cid","pos"},nil}, // GOAT: chan send [timestamp, stack, channel id, pos]
 	EvChClose:           {"ChClose", 1011, true, []string{"cid"},nil},// GOAT: chan close [timestamp, stack, channel id]
-	EvWgAdd:             {"WgAdd", 1011, true, []string{"wid","val"},nil}, // GOAT: wg add (and inited) [timestamp, stack, wg id, value]
-	EvWgWait:            {"WgWait", 1011, true, []string{"wid","pos"},nil}, // GOAT: wg wait [timestamp, stack, wg id]
 	EvMuLock:            {"MuLock", 1011, true, []string{"muid","pos"},nil},// GOAT: mu lock [timestamp, stack, mu id]
 	EvMuUnlock:          {"MuUnlock", 1011, true, []string{"muid"},nil},// GOAT: mu unlock [timestamp, stack, mu id]
-	EvSelect:            {"Select", 1011, true, []string{"pos"},nil},// GOAT: select [timestamp, stack, pos]
+	EvWgAdd:             {"WgAdd", 1011, true, []string{"wid","val","cnt","wcnt"},nil}, // GOAT: wg add (and inited) [timestamp, stack, wg id, value, counter, #waiters]
+	EvWgWait:            {"WgWait", 1011, true, []string{"wid","pos"},nil}, // GOAT: wg wait [timestamp, stack, wg id]
+	EvCvWait:            {"CvWait", 1011, true, []string{"cvid"},nil}, // GOAT: cond var wait [timestamp, stack, cv id]
+	EvCvSig:             {"CvSig", 1011, true, []string{"cvid","pos"},nil}, // GOAT: cond var signal [timestamp, stack, cv id, {1: signal, 2: broadcast}]
+	EvSelect:            {"Select", 1011, true, []string{"pos","casei","cid","kind"},nil},// GOAT: select [timestamp, stack, pos, casei, cid, kind]
+	EvSelecti:           {"Selecti", 1011, true, []string{"casei","polli","cidi","kindi"},nil},// GOAT: selecti [timestamp, stack, casei, polli, cidi, kindi]
 	EvSched:             {"Sched", 1011, true, []string{"pos","curg","aux"},nil}, // GOAT: sched [timestamp, stack, pos, curg, aux]
-	EvCvWait:            {"CvWait",1011, true, []string{"cvid"},nil}, // GOAT: cond var wait [timestamp, stack, cv id]
-  EvCvSig:             {"CvSig",1011, true, []string{"cvid","pos"},nil}, // GOAT: cond var signal [timestamp, stack, cv id, {1: signal, 2: broadcast}]
 }
