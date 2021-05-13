@@ -20,7 +20,7 @@ func newConcurrencyUsage(typ int, codeloc *CodeLocation) *ConcurrencyUsage{
 
 func (cl *ConcurrencyUsage) String() string{
 	//return concTypeDescription[cl.Type]+" - " +cl.OrigLoc.Filename+":"+strconv.Itoa(cl.OrigLoc.Line)
-	return cl.OrigLoc.Filename+":"+strconv.Itoa(cl.OrigLoc.Line)
+	return cl.OrigLoc.Filename+":"+strconv.Itoa(cl.OrigLoc.Line)+"("+ConcTypeDescription[cl.Type]+")"
 }
 
 type CodeLocation struct{
