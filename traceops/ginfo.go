@@ -111,7 +111,8 @@ func GetGoroutineInfo(parseResult *trace.ParseResult) (GoroutineInfo , map[uint6
 																 	 Gtype:OTHER}
 					edges = append(edges,&GEdge{Parent:e.G,Child:e.Args[0]})
 					//fmt.Printf(">>> Add G %v to gmap as OTHER\n",e.Args[0])
-
+					gi.Events = append(gi.Events,e)
+	        gmap[e.G] = gi
         } else{
           // the child that current e creates has already been existed in the map
           panic("child already in the map")
