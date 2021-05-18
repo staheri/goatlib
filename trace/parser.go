@@ -1079,7 +1079,7 @@ const (
 	EvCvWait            = 57 // GOAT: cond var wait [timestamp, stack, cv id]
   EvCvSig             = 58 // GOAT: cond var signal [timestamp, stack, cv id, {1: signal, 2: broadcast}]
   EvSelect            = 59 // GOAT: select [timestamp, stack, pos, casei, cid, kind]
-	EvSelecti           = 60 // GOAT: selecti [timestamp, stack, casei, polli, cidi, kindi]
+	EvSelecti           = 60 // GOAT: selecti [timestamp, stack, casei, cidi, kindi]
   EvSched             = 61 // GOAT: sched [timestamp, stack, pos, curg, aux]
 	EvCount             = 62
 )
@@ -1151,6 +1151,6 @@ var EventDescriptions = [EvCount]struct {
 	EvCvWait:            {"CvWait", 1011, true, []string{"cvid"},nil}, // GOAT: cond var wait [timestamp, stack, cv id]
 	EvCvSig:             {"CvSig", 1011, true, []string{"cvid","pos"},nil}, // GOAT: cond var signal [timestamp, stack, cv id, {1: signal, 2: broadcast}]
 	EvSelect:            {"Select", 1011, true, []string{"pos","casei","cid","kind"},nil},// GOAT: select [timestamp, stack, pos, casei, cid, kind]
-	EvSelecti:           {"Selecti", 1011, true, []string{"casei","polli","cidi","kindi"},nil},// GOAT: selecti [timestamp, stack, casei, polli, cidi, kindi]
+	EvSelecti:           {"Selecti", 1011, true, []string{"casei","cidi","kindi"},nil},// GOAT: selecti [timestamp, stack, casei, cidi, kindi]
 	EvSched:             {"Sched", 1011, true, []string{"pos","curg","aux"},nil}, // GOAT: sched [timestamp, stack, pos, curg, aux]
 }
