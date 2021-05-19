@@ -1074,14 +1074,16 @@ const (
   EvChClose           = 52 // GOAT: chan close [timestamp, stack, channel id]
 	EvMuLock            = 53 // GOAT: mu lock [timestamp, stack, mu id, pos]
   EvMuUnlock          = 54 // GOAT: mu unlock [timestamp, stack, mu id]
-	EvWgAdd             = 55 // GOAT: wg add (and inited, also used for Done) [timestamp, stack, wg id, value, counter, #waiters]
-  EvWgWait            = 56 // GOAT: wg wait [timestamp, stack, wg id, pos]
-	EvCvWait            = 57 // GOAT: cond var wait [timestamp, stack, cv id]
-  EvCvSig             = 58 // GOAT: cond var signal [timestamp, stack, cv id, {1: signal, 2: broadcast}]
-  EvSelect            = 59 // GOAT: select [timestamp, stack, pos, casei, cid, kind]
-	EvSelecti           = 60 // GOAT: selecti [timestamp, stack, casei, cidi, kindi]
-  EvSched             = 61 // GOAT: sched [timestamp, stack, pos, curg, aux]
-	EvCount             = 62
+	EvMuRLock           = 55 // GOAT: mu rlock [timestamp, stack, mu id, pos]
+  EvMuRUnlock         = 56 // GOAT: mu runlock [timestamp, stack, mu id, pos]
+	EvWgAdd             = 57 // GOAT: wg add (and inited, also used for Done) [timestamp, stack, wg id, value, counter, #waiters]
+  EvWgWait            = 58 // GOAT: wg wait [timestamp, stack, wg id, pos]
+	EvCvWait            = 59 // GOAT: cond var wait [timestamp, stack, cv id]
+  EvCvSig             = 60 // GOAT: cond var signal [timestamp, stack, cv id, {1: signal, 2: broadcast}]
+  EvSelect            = 61 // GOAT: select [timestamp, stack, pos, casei, cid, kind]
+	EvSelecti           = 62 // GOAT: selecti [timestamp, stack, casei, cidi, kindi]
+  EvSched             = 63 // GOAT: sched [timestamp, stack, pos, curg, aux]
+	EvCount             = 64
 )
 
 var EventDescriptions = [EvCount]struct {
@@ -1146,6 +1148,8 @@ var EventDescriptions = [EvCount]struct {
 	EvChClose:           {"ChClose", 1011, true, []string{"cid"},nil},// GOAT: chan close [timestamp, stack, channel id]
 	EvMuLock:            {"MuLock", 1011, true, []string{"muid","pos"},nil},// GOAT: mu lock [timestamp, stack, mu id]
 	EvMuUnlock:          {"MuUnlock", 1011, true, []string{"muid"},nil},// GOAT: mu unlock [timestamp, stack, mu id]
+	EvMuRLock:           {"MuRLock", 1011, true, []string{"muid","pos"},nil},// GOAT: mu rlock [timestamp, stack, mu id, pos]
+	EvMuRUnlock:         {"MuRUnlock", 1011, true, []string{"muid","pos"},nil},// GOAT: mu runlock [timestamp, stack, mu id, pos]
 	EvWgAdd:             {"WgAdd", 1011, true, []string{"wid","val","cnt","wcnt"},nil}, // GOAT: wg add (and inited) [timestamp, stack, wg id, value, counter, #waiters]
 	EvWgWait:            {"WgWait", 1011, true, []string{"wid","pos"},nil}, // GOAT: wg wait [timestamp, stack, wg id]
 	EvCvWait:            {"CvWait", 1011, true, []string{"cvid"},nil}, // GOAT: cond var wait [timestamp, stack, cv id]
