@@ -28,8 +28,8 @@ func rewrite_randomSched(origpath,newpath string, criticalPoints []*ConcurrencyU
   _concfiles := make(map[string]int) // extract concurrency files
 
   for _,c := range(criticalPoints){
-    conclines[c.OrigLoc.String()]=1
-    _concfiles[c.OrigLoc.Filename] = 1
+    conclines[c.Location.String()]=1
+    _concfiles[c.Location.FileName] = 1
   }
   for k,_ := range(_concfiles){
     concfiles = append(concfiles,k)
@@ -222,8 +222,8 @@ func rewrite_randomSchedOnly(origpath,newpath string, criticalPoints []*Concurre
   _concfiles := make(map[string]int) // extract concurrency files
 
   for _,c := range(criticalPoints){
-    conclines[c.OrigLoc.String()]=1
-    _concfiles[c.OrigLoc.Filename] = 1
+    conclines[c.Location.String()]=1
+    _concfiles[c.Location.FileName] = 1
   }
   for k,_ := range(_concfiles){
     concfiles = append(concfiles,k)

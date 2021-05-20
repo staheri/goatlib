@@ -34,13 +34,13 @@ func MeasureCoverage(parseResult *trace.ParseResult, concUsage []*instrument.Con
 			// iterate concUsage
 			for _,cu := range(concUsage){
 				// check file and line
-				//fmt.Printf("CHECK OK\nCU File:%s\nStack file:%s\n",cu.OrigLoc.Filename,frm.File)
-				if cu.OrigLoc.Filename == frm.File {
+				//fmt.Printf("CHECK OK\nCU File:%s\nStack file:%s\n",cu.Location.FileName,frm.File)
+				if cu.Location.FileName == frm.File {
 					fmt.Println("file ok")
-					if cu.OrigLoc.Line == frm.Line{
+					if cu.Location.Line == frm.Line{
 						fmt.Println("line ok")
 						if _,ok := concStackTable[stack_id] ; !ok{
-							cu.OrigLoc.Function = frm.Fn
+							cu.Location.Function = frm.Fn
 							concStackTable[stack_id] = cu
 							concStackIDs = append(concStackIDs,stack_id)
 						}
@@ -83,9 +83,9 @@ func MeasureCoverage(parseResult *trace.ParseResult, concUsage []*instrument.Con
 			}
 			var row []interface{}
 			row = append(row,e.StkID)
-			//row = append(row,concStackTable[e.StkID].OrigLoc.Filename)
-			row = append(row,concStackTable[e.StkID].OrigLoc.Function)
-			row = append(row,concStackTable[e.StkID].OrigLoc.Line)
+			//row = append(row,concStackTable[e.StkID].Location.FileName)
+			row = append(row,concStackTable[e.StkID].Location.Function)
+			row = append(row,concStackTable[e.StkID].Location.Line)
 			row = append(row,ed.Name)
 			row = append(row,e.G)
 			row = append(row,instrument.ConcTypeDescription[concStackTable[e.StkID].Type])
@@ -103,8 +103,8 @@ func MeasureCoverage(parseResult *trace.ParseResult, concUsage []*instrument.Con
 
 	for _,cu := range(concUsage){
 		var row []interface{}
-		row = append(row,cu.OrigLoc.Filename)
-		row = append(row,cu.OrigLoc.Line)
+		row = append(row,cu.Location.FileName)
+		row = append(row,cu.Location.Line)
 		row = append(row,instrument.ConcTypeDescription[cu.Type])
 		t.AppendRow(row)
 	}

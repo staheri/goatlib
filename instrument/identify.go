@@ -11,30 +11,30 @@ import(
 
 type ConcurrencyUsage struct{
 	Type              int                   `json:"type"`
-	OrigLoc           *CodeLocation         `json:"concusage"`
+	Location          *CodeLocation         `json:"location"`
 }
 
 func newConcurrencyUsage(typ int, codeloc *CodeLocation) *ConcurrencyUsage{
-	return &ConcurrencyUsage{Type: typ, OrigLoc:codeloc}
+	return &ConcurrencyUsage{Type: typ, Location:codeloc}
 }
 
 func (cl *ConcurrencyUsage) String() string{
 	//return concTypeDescription[cl.Type]+" - " +cl.OrigLoc.Filename+":"+strconv.Itoa(cl.OrigLoc.Line)
-	return cl.OrigLoc.Filename+":"+strconv.Itoa(cl.OrigLoc.Line)+"("+ConcTypeDescription[cl.Type]+")"
+	return cl.Location.FileName+":"+strconv.Itoa(cl.Location.Line)+"("+ConcTypeDescription[cl.Type]+")"
 }
 
 type CodeLocation struct{
-	Filename              string          `json:"filename"`
+	FileName              string          `json:"fileName"`
 	Function              string          `json:"function,omitempty"`   // will be empty in static instrumentation, will be updated duirng dynamic executions
 	Line                  int             `json:"line"`
 }
 
 func newCodeLocation(file string, line int) *CodeLocation {
-	return &CodeLocation{Filename: file, Line: line}
+	return &CodeLocation{FileName: file, Line: line}
 }
 
 func (cl *CodeLocation) String() string{
-	return cl.Filename+":"+strconv.Itoa(cl.Line)
+	return cl.FileName+":"+strconv.Itoa(cl.Line)
 }
 
 
