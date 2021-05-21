@@ -1,15 +1,8 @@
 package traceops
 
 import (
-	_"fmt"
 	"github.com/staheri/goatlib/trace"
-	_"path"
-	_"database/sql"
-	_ "github.com/go-sql-driver/mysql"
-	_"strconv"
 	"os"
-	_"strings"
-	_"time"
 	"io/ioutil"
 	"encoding/json"
 	"io"
@@ -25,9 +18,9 @@ func WriteTrace(traceBuff []byte, fileName string) int {
 	return size
 }
 
-func ReadTrace(fileName string) (io.Reader, error){
+func ReadTrace(fileName string) (io.Reader,int, error){
 	buf,err := ioutil.ReadFile(fileName)
-	return bytes.NewReader(buf),err
+	return bytes.NewReader(buf),len(buf),err
 }
 
 func TraceToJSON(parseResult *trace.ParseResult, jsonPath string){
@@ -39,4 +32,30 @@ func TraceToJSON(parseResult *trace.ParseResult, jsonPath string){
 	_,err = rep.WriteString(string(newdat))
 	check(err)
 	rep.Close()
+}
+
+
+func WriteTime(time string, fileName string) {
+	err := ioutil.WriteFile(fileName, []byte(time), 0777)
+	check(err)
+}
+
+
+func ReadTime(fileName string) string{
+	data, err := ioutil.ReadFile(fileName)
+  check(err)
+  return string(data)
+}
+
+
+// read trace and parse
+func ReadParseTrace(tracePath, binaryPath string) *trace.ParseResult{
+	// obtain trace
+	trc,_,err := ReadTrace(tracePath)
+	check(err)
+
+	parseRes,err := trace.ParseTrace(trc,binaryPath)
+	check(err)
+
+	return parseRes
 }

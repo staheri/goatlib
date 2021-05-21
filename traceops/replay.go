@@ -8,7 +8,7 @@ import (
 // read trace and check if it deadlocks
 func ReplayDeadlockChecker(tracePath, binaryPath string) DLReport{
 	// obtain trace
-	trc,err := ReadTrace(tracePath)
+	trc,_,err := ReadTrace(tracePath)
 	check(err)
 
 	parseRes,err := trace.ParseTrace(trc,binaryPath)
@@ -20,7 +20,7 @@ func ReplayDeadlockChecker(tracePath, binaryPath string) DLReport{
 // read trace and display its goroutines and stacks
 func ReplayDispGMAP(tracePath, binaryPath string) {
 	// obtain trace
-	trc,err := ReadTrace(tracePath)
+	trc,_,err := ReadTrace(tracePath)
 	check(err)
 
 	parseRes,err := trace.ParseTrace(trc,binaryPath)

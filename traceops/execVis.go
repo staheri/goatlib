@@ -31,7 +31,7 @@ func ExecVis(tracePath, binaryPath,resultPathName string, withStack bool) {
     iEvents = append(iEvents,evs...)
   }
   // obtain trace
-  trc,err := ReadTrace(tracePath)
+  trc,_,err := ReadTrace(tracePath)
   check(err)
 
   parseRes,err := trace.ParseTrace(trc,binaryPath)
