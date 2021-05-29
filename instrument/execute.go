@@ -10,10 +10,12 @@ import (
 	"log"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 )
 
 type ExecuteResult struct{
 	TraceBuffer     *bytes.Buffer
+	RaceMessage     string
 	ExecTime        time.Duration
 }
 
@@ -40,7 +42,7 @@ func BuildCommand (sourceDir,destDir,exMode,mode string, race bool) string{
 			cmd = exec.Command("go","build","-o",tmpBinary.Name())
 		}
 	}
-  var stderr bytes.Buffer
+  var stderr   bytes.Buffer
   cmd.Stderr = &stderr
   cmd.Dir = sourceDir
 
@@ -56,8 +58,10 @@ func BuildCommand (sourceDir,destDir,exMode,mode string, race bool) string{
 // - executes the instrumented binary
 // - Parses collected trace
 func ExecuteTrace(binary string, args ...string) (*ExecuteResult, error){
-	var stderr bytes.Buffer
-	var stdout bytes.Buffer
+	var stderr         bytes.Buffer
+	var stderr_back    bytes.Buffer
+	var stdout         bytes.Buffer
+	var traceBuf       bytes.Buffer
   var cmd *exec.Cmd
 	// run
 	log.Println("ExecuteTrace: Run ",binary)
@@ -69,20 +73,65 @@ func ExecuteTrace(binary string, args ...string) (*ExecuteResult, error){
 	if err := cmd.Run(); err != nil {
 		end := time.Now()
 		et := end.Sub(start)
-		fmt.Printf("modified program failed\nErr: %v\nStderr: %v\nStdout: %v\n", err, stderr.String(),stdout.String())
+		//fmt.Printf("modified program failed\nErr: %v\nStderr: %v\nStdout: %v\n", err, stderr.String(),stdout.String())
 		err1 := fmt.Errorf("%v:%v",err,stderr.String())
-		ret := &ExecuteResult{&stderr,et}
+
+		raceSeparator := "=================="
+		stderr_back = stderr
+		fi := strings.Index(stderr_back.String(), raceSeparator)
+		li := strings.LastIndex(stderr_back.String(), raceSeparator)
+		fmt.Printf("fi: %v - li %v\n",fi,li)
+		if fi != -1 && li > 0 && fi != li{ // there is a race
+			raceOut := stderr_back.Bytes()[fi:li+len(raceSeparator)]
+			raceMsg := bytes.NewBuffer(raceOut).String()
+			//raceBuf = *bytes.NewBuffer(raceOut)
+			traceOut := stderr.Bytes()[:fi]
+			//fmt.Printf("TRACE _ 1 : %v\n",bytes.NewBuffer(traceOut).String())
+			//fmt.Printf("RACE: %v\n",raceMsg)
+			traceOut = append(traceOut,stderr.Bytes()[li+len(raceSeparator)+1:]...)
+			//fmt.Printf("TRACE _ 1 : %v\n",bytes.NewBuffer(traceOut).String())
+			traceBuf = *bytes.NewBuffer(traceOut)
+
+			// if there is any runtime error: it would be in traceBuf
+
+			ret := &ExecuteResult{TraceBuffer:&traceBuf,RaceMessage:raceMsg,ExecTime:et}
+			// check length of stderr
+			//if bytes.NewBuffer(traceOut).Len() == 0 {
+			if traceBuf.Len() == 0 {
+				return nil, errors.New("empty trace")
+			}
+			return ret,nil
+		}
+		ret := &ExecuteResult{TraceBuffer:&stderr,ExecTime:et}
 		return ret, err1
 	}
 	end := time.Now()
 	et := end.Sub(start)
+	raceSeparator := "=================="
+	stderr_back = stderr
+	fi := strings.Index(stderr_back.String(), raceSeparator)
+	li := strings.LastIndex(stderr_back.String(), raceSeparator)
+	fmt.Printf("fi: %v - li %v\n",fi,li)
+	if fi != -1 && li > 0 && fi != li{
+		raceOut := stderr_back.Bytes()[fi:li+len(raceSeparator)]
+		raceMsg := bytes.NewBuffer(raceOut).String()
+		//raceBuf = *bytes.NewBuffer(raceOut)
+		traceOut := stderr.Bytes()[:fi]
+		//fmt.Printf("TRACE _ 1 : %v\n",bytes.NewBuffer(traceOut).String())
+		//fmt.Printf("RACE: %v\n",raceMsg)
+		traceOut = append(traceOut,stderr.Bytes()[li+len(raceSeparator)+1:]...)
+		traceBuf = *bytes.NewBuffer(traceOut)
 
-	// check length of stderr
-	if stderr.Len() == 0 {
-		return nil, errors.New("empty trace")
+		//fmt.Printf("(W) TRACE _ 1 : %v\n",traceBuf.String())
+		//fmt.Printf("(W) RACE: %v\n",raceBuf.String())
+		ret := &ExecuteResult{TraceBuffer:&traceBuf,RaceMessage:raceMsg,ExecTime:et}
+		// check length of stderr
+		if bytes.NewBuffer(traceOut).Len() == 0 {
+			return nil, errors.New("empty trace")
+		}
+		return ret,nil
 	}
-
-	ret := &ExecuteResult{&stderr,et}
+	ret := &ExecuteResult{TraceBuffer:&stderr,ExecTime:et}
 	return ret,nil
 }
 
