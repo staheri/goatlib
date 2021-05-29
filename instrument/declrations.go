@@ -3,7 +3,6 @@ package instrument
 import (
 	"go/ast"
 	"go/token"
-	"strconv"
 )
 
 // returns "if Reschedule then Gosched()" line node
@@ -20,9 +19,9 @@ func astNode_sched() *ast.ExprStmt{
 
 
 // wrapper for new declrations
-func astNode_goatMain(maxprocs int) []ast.Stmt {
+func astNode_goatMain() []ast.Stmt {
 	ret := make([]ast.Stmt,3)
-	ret[0] = astNode_goatStart(maxprocs)
+	ret[0] = astNode_goatStart()
 	ret[1] = astNode_goatWatch()
 	ret[2] = astNode_goatStop()
 	//ret[3] = astNode_goatDoneAck()
@@ -60,7 +59,7 @@ func astNode_goatStopTrace() *ast.ExprStmt{
 }
 
 // ast node for "GOAT_done := goat.Start()"
-func astNode_goatStart(maxprocs int) *ast.AssignStmt{
+func astNode_goatStart() *ast.AssignStmt{
 	return &ast.AssignStmt{
 		Tok: token.DEFINE,
 		Lhs: []ast.Expr{
@@ -82,16 +81,16 @@ func astNode_goatStart(maxprocs int) *ast.AssignStmt{
 
 
 // ast node for "GOAT_done := goat.Start()"
-func astNode_goatStartRace(maxprocs int) *ast.ExprStmt{
+func astNode_goatStartRace() *ast.ExprStmt{
 	return &ast.ExprStmt{
 		X: &ast.CallExpr{
 			Fun: &ast.SelectorExpr{
 				X:   &ast.Ident{Name: "goat"},
 				Sel: &ast.Ident{Name: "StartRace"},
 			},
-			Args : []ast.Expr{
-			 &ast.BasicLit{Kind: token.INT, Value: strconv.Itoa(maxprocs)},
-			},
+			// Args : []ast.Expr{
+			//  &ast.BasicLit{Kind: token.INT, Value: strconv.Itoa(maxprocs)},
+			// },
 		},
 	}
 }
@@ -130,6 +129,22 @@ func astNode_convertDefer(def *ast.DeferStmt) *ast.DeferStmt{
 	}
 }
 
+func astNode_convertDeferNoSched(def *ast.DeferStmt) *ast.DeferStmt{
+	return &ast.DeferStmt{
+		Call: &ast.CallExpr{
+			Fun: &ast.FuncLit{
+				Body: &ast.BlockStmt{
+					List: []ast.Stmt{
+						&ast.ExprStmt{
+							X: def.Call,
+						},
+					},
+				},
+				Type: &ast.FuncType{Params: &ast.FieldList{}},
+			},
+		},
+	}
+}
 
 func astNode_goatStop() *ast.DeferStmt{
 	return &ast.DeferStmt{
@@ -147,7 +162,7 @@ func astNode_goatStop() *ast.DeferStmt{
 
 
 // wrapper for new declrations
-func astNode_goatRaceMain(maxprocs int) []ast.Stmt {
-	ret := []ast.Stmt{astNode_goatStartRace(maxprocs)}
+func astNode_goatRaceMain() []ast.Stmt {
+	ret := []ast.Stmt{astNode_goatStartRace()}
 	return ret
 }

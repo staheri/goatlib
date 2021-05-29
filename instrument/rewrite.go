@@ -13,8 +13,6 @@ import (
 	"strings"
 )
 
-const MAXPROCS = 4
-
 // add both tracing and delays
 func rewrite_randomSched(origpath,newpath string, criticalPoints []*ConcurrencyUsage) []string{
   // Variables
@@ -108,7 +106,7 @@ func rewrite_randomSched(origpath,newpath string, criticalPoints []*ConcurrencyU
     		case *ast.FuncDecl:
     			// find 'main' function
     			if x.Name.Name == "main" && x.Recv == nil {
-            toAdd := astNode_goatMain(1)
+            toAdd := astNode_goatMain()
             stmts := []ast.Stmt{toAdd[0]}
             stmts = append(stmts,toAdd[1])
             stmts = append(stmts,toAdd[2])
@@ -116,7 +114,7 @@ func rewrite_randomSched(origpath,newpath string, criticalPoints []*ConcurrencyU
             x.Body.List = stmts
     				return true
     			}else if strings.HasPrefix(x.Name.Name,"Test") && x.Recv == nil{
-            toAdd := astNode_goatMain(1)
+            toAdd := astNode_goatMain()
             stmts := []ast.Stmt{toAdd[0]}
             stmts = append(stmts,toAdd[1])
             stmts = append(stmts,toAdd[2])
@@ -166,7 +164,26 @@ func rewrite_traceOnly(origpath,newpath string) []string{
   //      add (at the beginning) GOAT_done := goat.Start()
 	//      add (at the beginning) go goat.Finish(GOAT_done,10)
   //      add (at the end) GOAT_done <- true
+	// add schedcalls wherever concusage
+	// replace defer call --> defer func(){call}()
+
   for _,astFile := range(astfiles){
+		// replace defer call --> defer func(){call}()
+		astutil.Apply(astFile, func(cr *astutil.Cursor) bool{
+			n := cr.Node()
+			if n != nil{
+				switch x:= n.(type){
+				case *ast.DeferStmt:
+					ds := n.(*ast.DeferStmt)
+					cr.Replace(astNode_convertDeferNoSched(ds))
+					_ = x
+					return true
+				}
+				return true
+			}
+			return true
+		},nil)
+
     if mainIn(astFile) || testIn(astFile){
 			// add import
 			astutil.AddImport(prog.Fset, astFile, "github.com/staheri/goat/goat")
@@ -176,7 +193,7 @@ func rewrite_traceOnly(origpath,newpath string) []string{
     		case *ast.FuncDecl:
     			// find 'main' function
     			if x.Name.Name == "main" && x.Recv == nil {
-            toAdd := astNode_goatMain(MAXPROCS)
+            toAdd := astNode_goatMain()
             stmts := []ast.Stmt{toAdd[0]}
             stmts = append(stmts,toAdd[1])
             stmts = append(stmts,toAdd[2])
@@ -184,7 +201,7 @@ func rewrite_traceOnly(origpath,newpath string) []string{
             x.Body.List = stmts
     				return true
     			}else if strings.HasPrefix(x.Name.Name,"Test") && x.Recv == nil{
-            toAdd := astNode_goatMain(MAXPROCS)
+            toAdd := astNode_goatMain()
             stmts := []ast.Stmt{toAdd[0]}
             stmts = append(stmts,toAdd[1])
             stmts = append(stmts,toAdd[2])
@@ -298,7 +315,7 @@ func rewrite_randomSchedOnly(origpath,newpath string, criticalPoints []*Concurre
     		case *ast.FuncDecl:
     			// find 'main' function
     			if x.Name.Name == "main" && x.Recv == nil {
-            toAdd := astNode_goatRaceMain(1)
+            toAdd := astNode_goatRaceMain()
             stmts := []ast.Stmt{toAdd[0]}
             //stmts = append(stmts,toAdd[1])
             //stmts = append(stmts,toAdd[2])
@@ -306,7 +323,7 @@ func rewrite_randomSchedOnly(origpath,newpath string, criticalPoints []*Concurre
             x.Body.List = stmts
     				return true
     			}else if strings.HasPrefix(x.Name.Name,"Test") && x.Recv == nil{
-						toAdd := astNode_goatRaceMain(1)
+						toAdd := astNode_goatRaceMain()
             stmts := []ast.Stmt{toAdd[0]}
 						stmts = append(stmts,x.Body.List...)
             x.Body.List = stmts
