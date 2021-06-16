@@ -80,8 +80,43 @@ func Identify(path string) []*ConcurrencyUsage{
 
 				// Select statment (Select)
 				case *ast.SelectStmt:
-					concusage = append(concusage,newConcurrencyUsage(SELECT,codeloc))
+					ss := n.(*ast.SelectStmt)
+					if len(ss.Body.List) > 2{
+						concusage = append(concusage,newConcurrencyUsage(SELECT,codeloc))
+						return true
+					} else if len(ss.Body.List) == 2{
+						cas0,ok := ss.Body.List[0].(*ast.CommClause)
+						if !ok{
+							return true
+						}
+						cas1,ok := ss.Body.List[1].(*ast.CommClause)
+						if !ok{
+							return true
+						}
+
+						if cas0.Comm == nil{
+							//fmt.Printf("non-def case: %v\n",cas1.Pos())
+							codeloc2 := newCodeLocation(
+								prog.Fset.Position(cas1.Pos()).Filename,
+								prog.Fset.Position(cas1.Pos()).Line,
+							)
+							concusage = append(concusage,newConcurrencyUsage(NBCASE,codeloc2))
+							concusage = append(concusage,newConcurrencyUsage(NBSELECT,codeloc))
+							return true
+						}
+						if cas1.Comm == nil{
+							codeloc2 := newCodeLocation(
+								prog.Fset.Position(cas0.Pos()).Filename,
+								prog.Fset.Position(cas0.Pos()).Line,
+							)
+							concusage = append(concusage,newConcurrencyUsage(NBCASE,codeloc2))
+							concusage = append(concusage,newConcurrencyUsage(NBSELECT,codeloc))
+							return true
+						}
+						return true
+					}
 					return true
+
 
 				// Selector (Mu(RW)Lock, Mu(RW)Unlock, (Cv/Wg)Wait, WgAdd, CvSignal, CvBroadcast)
 				case *ast.Ident:

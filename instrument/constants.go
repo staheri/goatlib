@@ -23,6 +23,8 @@ const(
   SIGNAL
   BROADCAST
   SELECT
+  NBSELECT
+  NBCASE
   RANGE
   COUNT
 )
@@ -55,5 +57,8 @@ var ConcTypeDescription = [COUNT]string{
   "SIGNAL",
   "BROADCAST",
   "SELECT",
+  "NBSELECT",
+  "NBCASE",
   "RANGE",
+
 }

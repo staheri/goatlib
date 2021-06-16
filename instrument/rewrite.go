@@ -26,6 +26,9 @@ func rewrite_randomSched(origpath,newpath string, criticalPoints []*ConcurrencyU
   _concfiles := make(map[string]int) // extract concurrency files
 
   for _,c := range(criticalPoints){
+		if c.Type == NBCASE{ // we do not want to inject delay before NB_Select cases
+			continue
+		}
     conclines[c.Location.String()]=1
     _concfiles[c.Location.FileName] = 1
   }

@@ -96,7 +96,7 @@ func ExecVis(tracePath, binaryPath,resultPathName string, withStack bool) {
     }
 
     // ignore GOAT events
-    if isGoatFunction(e.Stk) && ed.Name != "GoSched"{
+    if IsGoatFunction(e.Stk) && ed.Name != "GoSched"{
       continue
     }
 
@@ -221,7 +221,7 @@ func ExecVis(tracePath, binaryPath,resultPathName string, withStack bool) {
 
 }
 
-func isGoatFunction(stack []*trace.Frame) bool{
+func IsGoatFunction(stack []*trace.Frame) bool{
   for _,frm := range(stack){
     if strings.HasPrefix(frm.Fn,"github.com/staheri/goat/goat"){
       return true
