@@ -23,6 +23,17 @@ type Row struct{
 
 
 
+func GInfo2NodeLabel(ginfo *GInfo) string{
+	s := ""
+	s = s + fmt.Sprintf("GID: %v\\l | ",ginfo.Gid)
+	s = s + fmt.Sprintf("Create Site: %s\\l",stackToString(ginfo.CreateStack_frame,true))
+	le := "-"
+	if len(ginfo.Events) > 0{
+		le = trace.EventDescriptions[ginfo.Events[len(ginfo.Events)-1].Type].Name
+	}
+	s = s + fmt.Sprintf("Last Event: %s\\l",le)
+	return s
+}
 
 // Visualize execution
 func ExecVis(tracePath, binaryPath,resultPathName string, withStack bool) {
@@ -217,6 +228,75 @@ func ExecVis(tracePath, binaryPath,resultPathName string, withStack bool) {
   //log.Println(">>> ExecVis: Result: " + out.String())
 	// end cmd
 	fmt.Println("ExecVis: Generated visualization: ", outpdf)
+
+
+}
+
+func ExecGtree(tracePath, binaryPath,resultPathName string) {
+  // obtain trace
+  trc,_,err := ReadTrace(tracePath)
+  check(err)
+
+  parseRes,err := trace.ParseTrace(trc,binaryPath)
+  check(err)
+
+	gs,_,edges := GetGoroutineInfo(parseRes)
+	//children := make(map[uint64][]uint64)
+
+	targetG := []*GInfo{}
+	targetG = append(targetG,gs.Main)
+	targetG = append(targetG,gs.App...) // ignoe goat_watch
+	targetGuint := []uint64{}
+
+	gtree_dot := "digraph{\n\tnode[shape=record,style=filled,fillcolor=gray95]\n\n\t"
+
+	for i := 0 ; i<len(targetG) ; i++{
+		gi := targetG[i]
+    targetGuint = append(targetGuint,gi.Gid)
+		label := GInfo2NodeLabel(gi)
+		gtree_dot = gtree_dot + fmt.Sprintf("%v [ label = \"{ %v }\" style=bold]\n\t",gi.Gid,label)
+	}
+	gtree_dot = gtree_dot + "\n\n\t"
+	for _, e := range(edges) {
+		gtree_dot = gtree_dot + fmt.Sprintf("%v -> %v\n\t",e.Parent,e.Child)
+	}
+  gtree_dot = gtree_dot + "}"
+
+	outdot := resultPathName
+	outpdf := resultPathName
+
+	outdot = outdot + "_gtree.dot"
+	outpdf = outpdf + "_gtree.pdf"
+
+	//write dot file
+	f, err := os.Create(outdot)
+	if err != nil {
+		panic(err)
+	}
+
+
+	f.WriteString(gtree_dot)
+	f.Close()
+
+	// start cmd
+	// Create pdf
+	_cmd := "dot -Tpdf " + outdot + " -o " + outpdf
+	cmd := exec.Command("dot", "-Tpdf", outdot, "-o", outpdf)
+	log.Printf(">>> ExecVis: Executing %s...\n", _cmd)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	if err != nil {
+		log.Printf("Error creating pdf: %s - %s",outpdf,fmt.Sprint(err) + ": " + stderr.String())
+		//panic(err)
+		return
+	}
+
+  //log.Println(">>> ExecVis: Result: " + out.String())
+	// end cmd
+	fmt.Println("GTREE: Generated visualization: ", outpdf)
 
 
 }
